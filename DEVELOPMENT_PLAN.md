@@ -53,6 +53,7 @@ intelligent-parking-chatbot/
 │   ├── evaluate_rag.py          # RAG evaluation script (recall@k, precision)
 │   └── results/                 # Evaluation reports
 ├── docker-compose.yml           # Weaviate + PostgreSQL for local dev
+├── langgraph.json               # LangGraph deployment config (for LangSmith Studio)
 ├── pyproject.toml               # Project config and dependencies
 ├── .env.example                 # Environment variables template
 ├── .gitignore
@@ -75,12 +76,24 @@ intelligent-parking-chatbot/
 **Dependencies:**
 ```
 langchain, langchain-openai, langgraph, langsmith
+langgraph-cli[inmem]          # Local LangGraph server for LangSmith Studio
 weaviate-client
 psycopg2-binary, sqlalchemy
 python-dotenv
 pydantic, pydantic-settings
 pytest, pytest-asyncio
 ```
+
+- Create `langgraph.json` — LangGraph deployment config pointing to the compiled graph.
+  This file tells `langgraph dev` where to find the graph, enabling interactive testing in LangSmith Studio.
+  ```json
+  {
+    "graphs": {
+      "parking_chatbot": "./src/chatbot/graph.py:graph"
+    },
+    "env": ".env"
+  }
+  ```
 
 **Acceptance criteria:**
 - `docker compose up` starts Weaviate and PostgreSQL locally.
@@ -137,11 +150,15 @@ pytest, pytest-asyncio
 - Implement nodes in `src/chatbot/nodes.py`.
 - Create `src/main.py` — CLI interface to interact with the chatbot.
 - Connect LangSmith for tracing (set env vars).
+- Ensure the compiled graph is exported in `src/chatbot/graph.py` as `graph` so that
+  `langgraph.json` can reference it (`graph = workflow.compile()`).
+- Verify the graph works in LangSmith Studio via `langgraph dev`.
 
 **Acceptance criteria:**
 - Chatbot answers parking-related questions using retrieved context.
 - Chatbot can collect reservation details (name, date, time, parking spot).
 - Conversation flow is visible in LangSmith.
+- `langgraph dev` starts the local server and the graph is testable interactively in LangSmith Studio.
 
 ---
 
@@ -200,13 +217,18 @@ cp .env.example .env
 # 4. Load data
 python -m src.data.loader
 
-# 5. Run chatbot
+# 5. Run chatbot (CLI)
 python -m src.main
 
-# 6. Run tests
+# 6. Run chatbot in LangSmith Studio (interactive graph testing)
+langgraph dev
+# Then open LangSmith Studio in browser — the graph will be available for
+# interactive testing, step-by-step debugging, and state inspection.
+
+# 7. Run tests
 pytest
 
-# 7. Run evaluation
+# 8. Run evaluation
 python -m evaluation.evaluate_rag
 ```
 
