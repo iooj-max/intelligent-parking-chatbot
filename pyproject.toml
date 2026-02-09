@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intelligent-parking-chatbot"
+version = "0.1.0"
+description = "Intelligent parking chatbot based on RAG with LangGraph"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain>=0.3",
+    "langchain-openai>=0.3",
+    "langgraph>=0.2",
+    "langsmith>=0.2",
+    "weaviate-client>=4.9",
+    "psycopg2-binary>=2.9",
+    "sqlalchemy>=2.0",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "langgraph-cli[inmem]>=0.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
