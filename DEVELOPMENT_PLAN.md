@@ -199,36 +199,93 @@ pytest, pytest-asyncio
 
 ---
 
-## Local Development Workflow
+## Local Development Workflow (macOS)
+
+### First-time setup
 
 ```bash
-# 1. Start infrastructure
-docker compose up -d
+# 1. Clone the repository
+git clone https://github.com/iooj-max/intelligent-parking-chatbot.git
+cd intelligent-parking-chatbot
 
-# 2. Set up Python environment
-python -m venv .venv
+# 2. Create Python virtual environment (requires Python 3.11+)
+python3 -m venv .venv
 source .venv/bin/activate
+
+# 3. Install the project and all dependencies
 pip install -e ".[dev]"
 
-# 3. Configure environment
+# 4. Set up environment variables
 cp .env.example .env
-# Edit .env with your API keys
+# Open .env in your editor and fill in:
+#   - OPENAI_API_KEY
+#   - LANGSMITH_API_KEY
+#   - Database connection strings (defaults work with docker-compose)
 
-# 4. Load data
+# 5. Start Weaviate and PostgreSQL
+docker compose up -d
+
+# 6. Load parking data into databases
 python -m src.data.loader
+```
 
-# 5. Run chatbot (CLI)
+### Daily workflow: pull changes and run
+
+```bash
+cd intelligent-parking-chatbot
+source .venv/bin/activate
+
+# Pull latest code from main
+git pull origin main
+
+# Make sure infrastructure is running
+docker compose up -d
+
+# Run the chatbot (CLI mode)
 python -m src.main
 
-# 6. Run chatbot in LangSmith Studio (interactive graph testing)
+# — OR — Run in LangSmith Studio (interactive graph testing)
 langgraph dev
-# Then open LangSmith Studio in browser — the graph will be available for
-# interactive testing, step-by-step debugging, and state inspection.
+# Opens a local LangGraph server. Go to LangSmith Studio in your browser —
+# the graph will appear for interactive testing, step-by-step node debugging,
+# and state inspection.
+```
 
-# 7. Run tests
+### After code changes: update dependencies
+
+```bash
+# If pyproject.toml changed — reinstall the project
+pip install -e ".[dev]"
+
+# If data files changed — reload data into databases
+python -m src.data.loader
+```
+
+### After docker-compose.yml changes: rebuild containers
+
+```bash
+# Pull fresh images (Weaviate, PostgreSQL) if versions were bumped
+docker compose pull
+
+# Recreate containers with updated config (preserves data in volumes)
+docker compose up -d
+
+# If you need a clean start (DESTROYS ALL DATA in volumes):
+# docker compose down -v
+# docker compose up -d
+# python -m src.data.loader   # re-load data after volume wipe
+```
+
+### Running tests and evaluation
+
+```bash
+# Run all tests
 pytest
 
-# 8. Run evaluation
+# Run a specific test file
+pytest tests/test_rag.py
+
+# Run evaluation and generate report
 python -m evaluation.evaluate_rag
 ```
 
