@@ -18,6 +18,8 @@ dependencies = [
     "python-dotenv>=1.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
+    "ragas>=0.1.0",
+    "datasets>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -34,3 +36,6 @@ include = ["src*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (require running databases)",
+]

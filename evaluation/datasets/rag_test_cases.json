@@ -1,0 +1,77 @@
+[
+  {
+    "query": "What are the hours for Downtown Plaza parking?",
+    "relevant_ids": [
+      "data/static/downtown_plaza/hours.md",
+      "downtown_plaza"
+    ],
+    "description": "Should retrieve hours document and facility data"
+  },
+  {
+    "query": "How much does airport parking cost per hour?",
+    "relevant_ids": [
+      "data/static/airport_parking/pricing.md",
+      "airport_parking"
+    ],
+    "description": "Should retrieve pricing document"
+  },
+  {
+    "query": "Is there parking available downtown right now?",
+    "relevant_ids": [
+      "downtown_plaza"
+    ],
+    "description": "Should retrieve real-time availability from PostgreSQL"
+  },
+  {
+    "query": "What security features does Airport Parking have?",
+    "relevant_ids": [
+      "data/static/airport_parking/security.md"
+    ],
+    "description": "Should retrieve security document"
+  },
+  {
+    "query": "Tell me about accessibility at Downtown Plaza",
+    "relevant_ids": [
+      "data/static/downtown_plaza/accessibility.md"
+    ],
+    "description": "Should retrieve accessibility document"
+  },
+  {
+    "query": "Can I reserve a spot at airport parking?",
+    "relevant_ids": [
+      "data/static/airport_parking/reservations.md",
+      "airport_parking"
+    ],
+    "description": "Should retrieve reservation policy"
+  },
+  {
+    "query": "What are the long-term rates downtown?",
+    "relevant_ids": [
+      "data/static/downtown_plaza/pricing.md",
+      "downtown_plaza"
+    ],
+    "description": "Should retrieve pricing with long-term info"
+  },
+  {
+    "query": "Where is the airport parking located?",
+    "relevant_ids": [
+      "data/static/airport_parking/location.md",
+      "airport_parking"
+    ],
+    "description": "Should retrieve location document and facility"
+  },
+  {
+    "query": "What payment methods are accepted downtown?",
+    "relevant_ids": [
+      "data/static/downtown_plaza/payment.md"
+    ],
+    "description": "Should retrieve payment document"
+  },
+  {
+    "query": "How many spaces are available at downtown plaza?",
+    "relevant_ids": [
+      "downtown_plaza"
+    ],
+    "description": "Should retrieve real-time data from PostgreSQL"
+  }
+]

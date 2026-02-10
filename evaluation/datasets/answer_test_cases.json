@@ -1,0 +1,42 @@
+[
+  {
+    "question": "What are the hours for Downtown Plaza parking?",
+    "reference_answer": "Downtown Plaza is open Monday-Friday 6am-10pm, Saturday-Sunday 8am-8pm"
+  },
+  {
+    "question": "How much does airport parking cost per hour?",
+    "reference_answer": "Airport parking costs $3/hour for short-term parking"
+  },
+  {
+    "question": "Is parking available downtown right now?",
+    "reference_answer": "Check real-time availability - should mention specific number of spaces"
+  },
+  {
+    "question": "What security features does Airport Parking have?",
+    "reference_answer": "24/7 security cameras, security patrols, and well-lit facility"
+  },
+  {
+    "question": "Tell me about accessibility at Downtown Plaza",
+    "reference_answer": "ADA-compliant with wheelchair accessible entrances, elevators, and designated accessible parking spaces"
+  },
+  {
+    "question": "Can I reserve a spot at airport parking?",
+    "reference_answer": "Yes, advance reservations available online or by phone"
+  },
+  {
+    "question": "What are the long-term rates downtown?",
+    "reference_answer": "Long-term (7+ days) costs $40/day at Downtown Plaza"
+  },
+  {
+    "question": "Where is the airport parking located?",
+    "reference_answer": "Located at Terminal Road near Airport Terminal, coordinates 34.0522, -118.2437"
+  },
+  {
+    "question": "What payment methods are accepted downtown?",
+    "reference_answer": "Cash, credit cards (Visa, Mastercard, Amex), mobile payments"
+  },
+  {
+    "question": "How many spaces are available at downtown plaza?",
+    "reference_answer": "Check real-time data - should provide specific available/total count"
+  }
+]
