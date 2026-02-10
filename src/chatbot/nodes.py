@@ -30,6 +30,8 @@ from src.chatbot.prompts import (
 )
 from src.chatbot.state import ChatbotState
 from src.config import settings
+from src.guardrails.input_filter import InputValidator
+from src.guardrails.output_filter import OutputFilter
 from src.rag.retriever import ParkingRetriever
 from src.rag.sql_store import SQLStore
 from src.rag.vector_store import WeaviateStore
@@ -158,6 +160,17 @@ def retrieve(state: ChatbotState) -> Dict[str, Any]:
             logger.warning("No user message found in retrieve node")
             return {"error": "No user message to retrieve context for"}
 
+        # INPUT GUARDRAIL: Validate user input
+        validator = InputValidator()
+        validation = validator.validate(last_user_message)
+
+        if not validation["is_valid"]:
+            logger.warning(f"Input rejected: {validation['error_message']}")
+            return {
+                "messages": [AIMessage(content=validation["error_message"])],
+                "error": validation["error_message"],
+            }
+
         # Call retriever
         retriever = get_parking_retriever()
         result = retriever.retrieve(
@@ -220,10 +233,18 @@ def generate(state: ChatbotState) -> Dict[str, Any]:
 
         response = llm.invoke(messages)
 
+        # OUTPUT GUARDRAIL: Filter response for PII
+        output_filter = OutputFilter()
+        filtered = output_filter.filter_response(response.content)
+
+        final_content = filtered["filtered_response"]
+
         logger.info("Generated LLM response")
+        if filtered["pii_found"]:
+            logger.warning(f"PII masked in response: {filtered['pii_found']}")
 
         # Return AI message to be added to state
-        return {"messages": [AIMessage(content=response.content)]}
+        return {"messages": [AIMessage(content=final_content)]}
 
     except Exception as e:
         logger.error(f"Error in generate node: {e}")

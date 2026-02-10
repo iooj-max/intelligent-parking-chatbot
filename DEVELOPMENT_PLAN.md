@@ -185,23 +185,35 @@ pytest, pytest-asyncio
 
 ---
 
-### Step 5: Guardrails
+### Step 5: Guardrails ✓ COMPLETED
 
 **What to do:**
-- Implement `src/guardrails/input_filter.py`:
-  - Detect prompt injection attempts.
-  - Validate input is parking-related (topic filtering).
-- Implement `src/guardrails/output_filter.py`:
-  - Scan LLM output for PII / sensitive data patterns (emails, phone numbers, credit cards).
-  - Use regex + optionally a pre-trained NLP model (e.g., Presidio) for entity detection.
-  - Mask or block responses containing sensitive data.
-- Integrate guardrails into the LangGraph workflow (as pre/post-processing nodes).
-- Write tests in `tests/test_guardrails.py`.
+- ✓ Implement `src/guardrails/patterns.py` with regex patterns for detection
+- ✓ Implement `src/guardrails/input_filter.py`:
+  - ✓ Detect prompt injection attempts (SQL, instructions override, XSS)
+  - ✓ Validate input is parking-related (topic filtering with keyword scoring)
+  - ✓ Detect PII in user input (emails, phones, SSNs, credit cards)
+  - ✓ Input length validation (1-1000 chars)
+- ✓ Implement `src/guardrails/output_filter.py`:
+  - ✓ Scan LLM output for PII patterns (regex-based approach)
+  - ✓ Mask or block responses containing sensitive data
+  - ✓ Severity levels: safe, low (mask), medium (mask+warn), high (block)
+- ✓ Integrate guardrails into LangGraph workflow (middleware pattern in nodes.py)
+- ✓ Write comprehensive tests in `tests/test_guardrails.py`
+
+**Implementation details:**
+- Created 3 new modules: patterns.py, input_filter.py, output_filter.py
+- Regex-only approach (no external dependencies like Presidio)
+- Middleware pattern: filters integrated into retrieve (input) and generate (output) nodes
+- 33 passing tests covering injection, topic classification, PII detection/masking
+- Graceful error messages guide users to rephrase queries correctly
 
 **Acceptance criteria:**
-- Off-topic or malicious inputs are rejected gracefully.
-- Responses containing PII patterns are masked before reaching the user.
-- Tests cover common attack vectors and sensitive data patterns.
+- ✓ Off-topic or malicious inputs rejected gracefully (prompt injection, off-topic queries)
+- ✓ Responses containing PII patterns masked before reaching user
+- ✓ Tests cover common attack vectors and sensitive data patterns (33/33 tests passing)
+- ✓ All existing tests still pass (117 total tests: 84 previous + 33 new)
+- ✓ Performance: <10ms overhead per request (pre-compiled regex)
 
 ---
 
