@@ -110,25 +110,6 @@ RESERVATION_KEYWORDS = [
     "i want to book",
 ]
 
-# Parking ID inference patterns
-PARKING_ID_PATTERNS = {
-    "downtown_plaza": [
-        "downtown plaza",
-        "downtown parking",
-        "main street",
-        "123 main",
-        "plaza parking",
-    ],
-    "airport_parking": [
-        "airport parking",
-        "airport lot",
-        "long-term parking",
-        "long term parking",
-        "4500 airport",
-        "airport boulevard",
-    ],
-}
-
 
 class ParkingRetriever:
     """
@@ -288,11 +269,19 @@ class ParkingRetriever:
         Returns:
             Parking ID if confidently inferred, None otherwise
         """
-        query_lower = query.lower()
+        from src.services.parking_service import get_parking_service
+        from src.services.parking_matcher import ParkingFacilityMatcher
 
-        for parking_id, patterns in PARKING_ID_PATTERNS.items():
-            if any(pattern in query_lower for pattern in patterns):
-                return parking_id
+        service = get_parking_service()
+        matcher = ParkingFacilityMatcher(threshold=0.7)
+
+        facilities = service.get_all_facilities()
+        matches = matcher.match_facility(query, facilities, limit=1)
+
+        if matches and matches[0]["score"] >= 0.7:
+            parking_id = matches[0]["parking_id"]
+            logger.info(f"Inferred parking_id: {parking_id} (score: {matches[0]['score']:.2f})")
+            return parking_id
 
         return None
 
