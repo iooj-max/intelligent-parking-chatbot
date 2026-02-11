@@ -1,0 +1,4 @@
+date,open_time,close_time,is_closed,reason
+2026-12-25,,,true,Christmas Day
+2026-01-01,,,true,New Year's Day
+2026-07-04,08:00:00,18:00:00,false,Independence Day - Limited Hours
