@@ -398,11 +398,14 @@ class ParkingRetriever:
             # Availability
             if "availability" in dynamic_data:
                 avail = dynamic_data["availability"]
-                dynamic_section += "### Current Availability\n"
-                dynamic_section += f"- Total Spaces: {avail.total_spaces}\n"
-                dynamic_section += f"- Occupied: {avail.occupied_spaces}\n"
-                dynamic_section += f"- **Available: {avail.available_spaces}**\n"
-                dynamic_section += f"- Last Updated: {avail.last_updated.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                if avail is not None:
+                    dynamic_section += "### Current Availability\n"
+                    dynamic_section += f"- Total Spaces: {avail.total_spaces}\n"
+                    dynamic_section += f"- Occupied: {avail.occupied_spaces}\n"
+                    dynamic_section += f"- **Available: {avail.available_spaces}**\n"
+                    dynamic_section += f"- Last Updated: {avail.last_updated.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                else:
+                    logger.warning("Availability data is None")
 
             # Working hours
             if "working_hours" in dynamic_data:
