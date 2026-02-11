@@ -384,21 +384,27 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
                 validation_errors["name"] = "Name cannot be empty"
 
         elif next_field == "parking_id":
-            # Normalize parking facility name to ID
-            user_input_lower = last_user_message.lower()
+            # Use semantic matching to find parking facility
+            from src.services.parking_service import get_parking_service
+            from src.services.parking_matcher import ParkingFacilityMatcher
 
-            # Count matches instead of first match to avoid ambiguity
-            downtown_match = "downtown" in user_input_lower
-            airport_match = "airport" in user_input_lower
+            service = get_parking_service()
+            matcher = ParkingFacilityMatcher(threshold=0.6)
 
-            if downtown_match and airport_match:
-                validation_errors["parking_id"] = "Please specify only one facility: Downtown Plaza OR Airport Parking"
-            elif downtown_match:
-                validated_value = "downtown_plaza"
-            elif airport_match:
-                validated_value = "airport_parking"
+            # Try to match user input to facilities
+            facilities = service.get_all_facilities()
+            matches = matcher.match_facility(last_user_message, facilities, limit=3)
+
+            if len(matches) == 0:
+                facility_names = [f.name for f in facilities]
+                validation_errors["parking_id"] = f"Please specify one of: {', '.join(facility_names)}"
+            elif len(matches) > 1 and matches[0]["score"] < 0.9:
+                # Multiple matches without clear winner - ask for disambiguation
+                facility_list = ", ".join([m['name'] for m in matches])
+                validation_errors["parking_id"] = f"Multiple facilities match: {facility_list}. Please be more specific."
             else:
-                validation_errors["parking_id"] = "Please specify either Downtown Plaza or Airport Parking"
+                # Clear match
+                validated_value = matches[0]['parking_id']
 
         elif next_field == "date":
             # Parse date in YYYY-MM-DD format
