@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +10,17 @@ class Settings(BaseSettings):
     )
 
     # LLM
-    openai_api_key: str = ""
+    openai_api_key: str
+
+    @field_validator('openai_api_key')
+    @classmethod
+    def validate_openai_key(cls, v: str) -> str:
+        """Validate OpenAI API key is present and correctly formatted."""
+        if not v or v.strip() == "":
+            raise ValueError("OpenAI API key is required")
+        if not v.startswith("sk-"):
+            raise ValueError("Invalid OpenAI API key format (must start with 'sk-')")
+        return v
 
     # LangSmith
     langsmith_api_key: str = ""

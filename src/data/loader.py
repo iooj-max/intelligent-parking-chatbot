@@ -67,21 +67,38 @@ class DataLoader:
         self.static_dir = self.data_dir / "static"
         self.dynamic_dir = self.data_dir / "dynamic"
 
-        # Metadata for parking facilities (used in Weaviate chunks)
+        # Load parking facility metadata dynamically from PostgreSQL
+        from src.services.parking_service import get_parking_service
+        service = get_parking_service()
+        facilities = service.get_all_facilities()
+
         self.parking_metadata = {
-            "downtown_plaza": {
-                "parking_name": "Downtown Plaza Parking",
-                "address": "123 Main Street",
-                "city": "City",
-                "coordinates": {"latitude": 40.7580, "longitude": -73.9855},
-            },
-            "airport_parking": {
-                "parking_name": "Airport Long-Term Parking",
-                "address": "4500 Airport Boulevard",
-                "city": "City",
-                "coordinates": {"latitude": 40.6413, "longitude": -73.7781},
-            },
+            f.parking_id: {
+                "parking_name": f.name,
+                "address": f.address,
+                "city": f.city,
+                "coordinates": {"latitude": float(f.latitude) if f.latitude else None,
+                                "longitude": float(f.longitude) if f.longitude else None},
+            }
+            for f in facilities
         }
+
+    def _sanitize_csv_value(self, value: str) -> str:
+        """
+        Sanitize CSV values to prevent formula injection.
+
+        Protects against CSV injection attacks by escaping values that
+        start with formula characters (=, +, -, @).
+
+        Args:
+            value: CSV cell value
+
+        Returns:
+            Sanitized value safe for database insertion
+        """
+        if isinstance(value, str) and value.startswith(('=', '+', '-', '@')):
+            return "'" + value  # Prefix with quote to prevent formula execution
+        return value
 
     def load_static_data(self, parking_ids: List[str], reset: bool = False) -> int:
         """

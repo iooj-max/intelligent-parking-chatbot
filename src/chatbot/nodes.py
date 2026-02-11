@@ -25,7 +25,6 @@ from src.chatbot.prompts import (
     FIELD_PROMPTS,
     INFO_PROMPT_TEMPLATE,
     INFO_SYSTEM_PROMPT,
-    PARKING_NAMES,
     RESERVATION_SYSTEM_PROMPT,
 )
 from src.chatbot.state import ChatbotState
@@ -53,6 +52,11 @@ def get_parking_retriever() -> ParkingRetriever:
         sql_store = SQLStore()
         embedding_generator = EmbeddingGenerator()
         _retriever = ParkingRetriever(vector_store, sql_store, embedding_generator)
+
+        # Register cleanup on process exit to prevent memory leaks
+        import atexit
+        atexit.register(lambda: vector_store.close())
+        atexit.register(lambda: sql_store.engine.dispose())
     return _retriever
 
 
@@ -204,15 +208,19 @@ def generate(state: ChatbotState) -> Dict[str, Any]:
         State updates with AI message added
     """
     try:
-        # Get last user message
+        # Get last user message with explicit None handling
         last_user_message = None
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage):
                 last_user_message = msg.content
                 break
 
-        if not last_user_message:
-            return {"error": "No user message found"}
+        if not last_user_message or last_user_message.strip() == "":
+            logger.warning("No valid user message found in generate node")
+            return {
+                "messages": [AIMessage(content="I didn't receive a clear question. Could you please rephrase?")],
+                "error": "No user message found"
+            }
 
         # Get context from state
         context = state.get("context", "No context available")
@@ -345,10 +353,14 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
                 break
 
         if not next_field:
-            # No field to validate
-            return {}
+            # No field to validate - this shouldn't happen
+            logger.error("validate_input called but no next_field found")
+            return {
+                "error": "Validation error: no field to validate",
+                "messages": [AIMessage(content="Something went wrong with the reservation. Let's start over.")]
+            }
 
-        # Get last user message
+        # Get last user message with null check
         last_user_message = None
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage):
@@ -356,7 +368,11 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
                 break
 
         if not last_user_message:
-            return {"error": "No user input to validate"}
+            logger.warning("No user input found for validation")
+            return {
+                "error": "No user input to validate",
+                "messages": [AIMessage(content="I didn't receive your input. Could you please try again?")]
+            }
 
         # Validate based on field type
         validated_value = None
@@ -368,21 +384,38 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
                 validation_errors["name"] = "Name cannot be empty"
 
         elif next_field == "parking_id":
-            # Normalize parking facility name to ID
-            user_input_lower = last_user_message.lower()
-            if "downtown" in user_input_lower:
-                validated_value = "downtown_plaza"
-            elif "airport" in user_input_lower:
-                validated_value = "airport_parking"
+            # Use semantic matching to find parking facility
+            from src.services.parking_service import get_parking_service
+            from src.services.parking_matcher import ParkingFacilityMatcher
+
+            service = get_parking_service()
+            matcher = ParkingFacilityMatcher(threshold=0.6)
+
+            # Try to match user input to facilities
+            facilities = service.get_all_facilities()
+            matches = matcher.match_facility(last_user_message, facilities, limit=3)
+
+            if len(matches) == 0:
+                facility_names = [f.name for f in facilities]
+                validation_errors["parking_id"] = f"Please specify one of: {', '.join(facility_names)}"
+            elif len(matches) > 1 and matches[0]["score"] < 0.9:
+                # Multiple matches without clear winner - ask for disambiguation
+                facility_list = ", ".join([m['name'] for m in matches])
+                validation_errors["parking_id"] = f"Multiple facilities match: {facility_list}. Please be more specific."
             else:
-                validation_errors["parking_id"] = "Please specify either Downtown Plaza or Airport Parking"
+                # Clear match
+                validated_value = matches[0]['parking_id']
 
         elif next_field == "date":
             # Parse date in YYYY-MM-DD format
             try:
+                from datetime import timezone
+
                 parsed_date = datetime.strptime(last_user_message, "%Y-%m-%d").date()
-                # Check if date is today or future
-                if parsed_date < date.today():
+                # Use UTC for consistent comparison across timezones
+                today_utc = datetime.now(timezone.utc).date()
+
+                if parsed_date < today_utc:
                     validation_errors["date"] = "Date must be today or in the future"
                 else:
                     validated_value = parsed_date
@@ -468,9 +501,13 @@ def confirm_reservation(state: ChatbotState) -> Dict[str, Any]:
     try:
         reservation = state.get("reservation", {})
 
-        # Get parking name
+        # Get parking name dynamically from ParkingFacilityService
+        from src.services.parking_service import get_parking_service
+
         parking_id = reservation.get("parking_id")
-        parking_name = PARKING_NAMES.get(parking_id, parking_id)
+        service = get_parking_service()
+        facility = service.get_facility_by_id(parking_id)
+        parking_name = facility.name if facility else parking_id
 
         # Format confirmation message
         confirmation = CONFIRMATION_TEMPLATE.format(

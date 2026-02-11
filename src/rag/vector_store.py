@@ -53,6 +53,14 @@ class WeaviateStore:
         if self.client:
             self.client.close()
 
+    def __del__(self):
+        """Destructor to ensure connection is closed."""
+        try:
+            if self.client and hasattr(self.client, 'close'):
+                self.client.close()
+        except Exception:
+            pass  # Suppress errors during cleanup
+
     def collection_exists(self) -> bool:
         """
         Check if ParkingContent collection exists.

@@ -110,25 +110,6 @@ RESERVATION_KEYWORDS = [
     "i want to book",
 ]
 
-# Parking ID inference patterns
-PARKING_ID_PATTERNS = {
-    "downtown_plaza": [
-        "downtown plaza",
-        "downtown parking",
-        "main street",
-        "123 main",
-        "plaza parking",
-    ],
-    "airport_parking": [
-        "airport parking",
-        "airport lot",
-        "long-term parking",
-        "long term parking",
-        "4500 airport",
-        "airport boulevard",
-    ],
-}
-
 
 class ParkingRetriever:
     """
@@ -288,11 +269,19 @@ class ParkingRetriever:
         Returns:
             Parking ID if confidently inferred, None otherwise
         """
-        query_lower = query.lower()
+        from src.services.parking_service import get_parking_service
+        from src.services.parking_matcher import ParkingFacilityMatcher
 
-        for parking_id, patterns in PARKING_ID_PATTERNS.items():
-            if any(pattern in query_lower for pattern in patterns):
-                return parking_id
+        service = get_parking_service()
+        matcher = ParkingFacilityMatcher(threshold=0.7)
+
+        facilities = service.get_all_facilities()
+        matches = matcher.match_facility(query, facilities, limit=1)
+
+        if matches and matches[0]["score"] >= 0.7:
+            parking_id = matches[0]["parking_id"]
+            logger.info(f"Inferred parking_id: {parking_id} (score: {matches[0]['score']:.2f})")
+            return parking_id
 
         return None
 
@@ -398,11 +387,14 @@ class ParkingRetriever:
             # Availability
             if "availability" in dynamic_data:
                 avail = dynamic_data["availability"]
-                dynamic_section += "### Current Availability\n"
-                dynamic_section += f"- Total Spaces: {avail.total_spaces}\n"
-                dynamic_section += f"- Occupied: {avail.occupied_spaces}\n"
-                dynamic_section += f"- **Available: {avail.available_spaces}**\n"
-                dynamic_section += f"- Last Updated: {avail.last_updated.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                if avail is not None:
+                    dynamic_section += "### Current Availability\n"
+                    dynamic_section += f"- Total Spaces: {avail.total_spaces}\n"
+                    dynamic_section += f"- Occupied: {avail.occupied_spaces}\n"
+                    dynamic_section += f"- **Available: {avail.available_spaces}**\n"
+                    dynamic_section += f"- Last Updated: {avail.last_updated.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                else:
+                    logger.warning("Availability data is None")
 
             # Working hours
             if "working_hours" in dynamic_data:
