@@ -209,15 +209,19 @@ def generate(state: ChatbotState) -> Dict[str, Any]:
         State updates with AI message added
     """
     try:
-        # Get last user message
+        # Get last user message with explicit None handling
         last_user_message = None
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage):
                 last_user_message = msg.content
                 break
 
-        if not last_user_message:
-            return {"error": "No user message found"}
+        if not last_user_message or last_user_message.strip() == "":
+            logger.warning("No valid user message found in generate node")
+            return {
+                "messages": [AIMessage(content="I didn't receive a clear question. Could you please rephrase?")],
+                "error": "No user message found"
+            }
 
         # Get context from state
         context = state.get("context", "No context available")
@@ -350,10 +354,14 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
                 break
 
         if not next_field:
-            # No field to validate
-            return {}
+            # No field to validate - this shouldn't happen
+            logger.error("validate_input called but no next_field found")
+            return {
+                "error": "Validation error: no field to validate",
+                "messages": [AIMessage(content="Something went wrong with the reservation. Let's start over.")]
+            }
 
-        # Get last user message
+        # Get last user message with null check
         last_user_message = None
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage):
@@ -361,7 +369,11 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
                 break
 
         if not last_user_message:
-            return {"error": "No user input to validate"}
+            logger.warning("No user input found for validation")
+            return {
+                "error": "No user input to validate",
+                "messages": [AIMessage(content="I didn't receive your input. Could you please try again?")]
+            }
 
         # Validate based on field type
         validated_value = None

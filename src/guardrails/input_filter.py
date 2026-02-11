@@ -96,19 +96,21 @@ class TopicClassifier:
                 "reason": "Query contains off-topic keywords with no parking context",
             }
 
-        if parking_count == 0 and len(text.split()) > 5:
+        # Be more lenient - only reject long queries with no parking keywords
+        if parking_count == 0 and len(text.split()) > 10:
             return {
                 "is_relevant": False,
                 "parking_score": parking_score,
                 "off_topic_score": off_topic_score,
-                "reason": "Query lacks parking-related keywords",
+                "reason": "Query lacks parking keywords and appears off-topic",
             }
 
+        # For shorter queries or those with parking keywords, be permissive
         return {
             "is_relevant": True,
             "parking_score": parking_score,
             "off_topic_score": off_topic_score,
-            "reason": "Parking-related or reservation context",
+            "reason": "Query may be parking-related or requires context",
         }
 
 
