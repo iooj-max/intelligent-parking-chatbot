@@ -53,6 +53,11 @@ def get_parking_retriever() -> ParkingRetriever:
         sql_store = SQLStore()
         embedding_generator = EmbeddingGenerator()
         _retriever = ParkingRetriever(vector_store, sql_store, embedding_generator)
+
+        # Register cleanup on process exit to prevent memory leaks
+        import atexit
+        atexit.register(lambda: vector_store.close())
+        atexit.register(lambda: sql_store.engine.dispose())
     return _retriever
 
 
@@ -370,9 +375,16 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
         elif next_field == "parking_id":
             # Normalize parking facility name to ID
             user_input_lower = last_user_message.lower()
-            if "downtown" in user_input_lower:
+
+            # Count matches instead of first match to avoid ambiguity
+            downtown_match = "downtown" in user_input_lower
+            airport_match = "airport" in user_input_lower
+
+            if downtown_match and airport_match:
+                validation_errors["parking_id"] = "Please specify only one facility: Downtown Plaza OR Airport Parking"
+            elif downtown_match:
                 validated_value = "downtown_plaza"
-            elif "airport" in user_input_lower:
+            elif airport_match:
                 validated_value = "airport_parking"
             else:
                 validation_errors["parking_id"] = "Please specify either Downtown Plaza or Airport Parking"
@@ -380,9 +392,13 @@ def validate_input(state: ChatbotState) -> Dict[str, Any]:
         elif next_field == "date":
             # Parse date in YYYY-MM-DD format
             try:
+                from datetime import timezone
+
                 parsed_date = datetime.strptime(last_user_message, "%Y-%m-%d").date()
-                # Check if date is today or future
-                if parsed_date < date.today():
+                # Use UTC for consistent comparison across timezones
+                today_utc = datetime.now(timezone.utc).date()
+
+                if parsed_date < today_utc:
                     validation_errors["date"] = "Date must be today or in the future"
                 else:
                     validated_value = parsed_date

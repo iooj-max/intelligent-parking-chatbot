@@ -122,15 +122,16 @@ def route_from_completion(state: ChatbotState) -> str:
     reservation = state.get("reservation", {})
     completed_fields = reservation.get("completed_fields", [])
 
+    # Check both field completion AND value presence
     all_complete = all(field in completed_fields for field in required_fields)
+    all_values_present = all(reservation.get(field) is not None for field in required_fields)
 
-    if all_complete:
-        logger.info("All fields collected, proceeding to confirmation")
+    if all_complete and all_values_present:
+        logger.info("All fields collected and validated, proceeding to confirmation")
         return "confirm_reservation"
     else:
-        logger.info(
-            f"Fields collected: {len(completed_fields)}/{len(required_fields)}, continuing collection"
-        )
+        missing = [f for f in required_fields if f not in completed_fields or reservation.get(f) is None]
+        logger.info(f"Fields incomplete: {missing}, continuing collection")
         return "collect_input"
 
 

@@ -8,6 +8,7 @@ special hours, and real-time space availability.
 FOR TESTING PURPOSES ONLY - Not production-ready implementation.
 """
 
+from contextlib import contextmanager
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import List, Optional
@@ -189,8 +190,22 @@ class SQLStore:
             dsn: PostgreSQL connection string. If None, uses settings.postgres_dsn
         """
         self.dsn = dsn or settings.postgres_dsn
+        self._dsn_redacted = self._redact_password(self.dsn)
         self.engine = create_engine(self.dsn, pool_pre_ping=True, pool_size=5, max_overflow=10)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+
+    def _redact_password(self, dsn: str) -> str:
+        """
+        Redact password from DSN for safe logging.
+
+        Args:
+            dsn: Database connection string
+
+        Returns:
+            DSN with password replaced by ****
+        """
+        import re
+        return re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', dsn)
 
     def create_tables(self) -> None:
         """
@@ -283,6 +298,28 @@ class SQLStore:
     def get_session(self) -> Session:
         """Get a new database session."""
         return self.SessionLocal()
+
+    @contextmanager
+    def get_session_context(self):
+        """
+        Context manager for automatic session cleanup.
+
+        Ensures sessions are properly closed even on exceptions,
+        preventing memory leaks.
+
+        Usage:
+            with sql_store.get_session_context() as session:
+                # ... database operations ...
+        """
+        session = self.get_session()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     # Facility CRUD operations
 

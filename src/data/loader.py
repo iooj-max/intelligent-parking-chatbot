@@ -83,6 +83,23 @@ class DataLoader:
             },
         }
 
+    def _sanitize_csv_value(self, value: str) -> str:
+        """
+        Sanitize CSV values to prevent formula injection.
+
+        Protects against CSV injection attacks by escaping values that
+        start with formula characters (=, +, -, @).
+
+        Args:
+            value: CSV cell value
+
+        Returns:
+            Sanitized value safe for database insertion
+        """
+        if isinstance(value, str) and value.startswith(('=', '+', '-', '@')):
+            return "'" + value  # Prefix with quote to prevent formula execution
+        return value
+
     def load_static_data(self, parking_ids: List[str], reset: bool = False) -> int:
         """
         Load static markdown content into Weaviate.
