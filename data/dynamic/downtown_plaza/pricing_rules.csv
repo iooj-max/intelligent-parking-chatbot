@@ -1,0 +1,6 @@
+rule_name,time_unit,price_per_unit,min_duration_minutes,max_duration_minutes,day_of_week_start,day_of_week_end,time_start,time_end,priority,is_active
+Hourly Rate,hour,5.00,,,,,,,1,true
+Daily Maximum,day,30.00,480,,,,,,,2,true
+Early Bird Special,day,15.00,,,0,4,06:00:00,09:00:00,5,true
+Evening Rate,hour,3.00,,,0,4,18:00:00,23:59:59,3,true
+Weekend Daily,day,20.00,,,5,6,,,4,true
