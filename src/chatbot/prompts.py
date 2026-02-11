@@ -96,11 +96,5 @@ CONFIRMATION_TEMPLATE = """Perfect! Here's your reservation summary:
 
 Is this correct? (Reply 'yes' to confirm or 'no' to cancel)"""
 
-# Mapping from parking_id to human-readable names
-PARKING_NAMES = {
-    "downtown_plaza": "Downtown Plaza Parking",
-    "airport_parking": "Airport Long-Term Parking",
-}
-
 # Cancellation detection keywords
 CANCELLATION_KEYWORDS = ["cancel", "stop", "quit", "nevermind", "never mind", "exit"]

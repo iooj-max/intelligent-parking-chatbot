@@ -25,7 +25,6 @@ from src.chatbot.prompts import (
     FIELD_PROMPTS,
     INFO_PROMPT_TEMPLATE,
     INFO_SYSTEM_PROMPT,
-    PARKING_NAMES,
     RESERVATION_SYSTEM_PROMPT,
 )
 from src.chatbot.state import ChatbotState
@@ -496,9 +495,13 @@ def confirm_reservation(state: ChatbotState) -> Dict[str, Any]:
     try:
         reservation = state.get("reservation", {})
 
-        # Get parking name
+        # Get parking name dynamically from ParkingFacilityService
+        from src.services.parking_service import get_parking_service
+
         parking_id = reservation.get("parking_id")
-        parking_name = PARKING_NAMES.get(parking_id, parking_id)
+        service = get_parking_service()
+        facility = service.get_facility_by_id(parking_id)
+        parking_name = facility.name if facility else parking_id
 
         # Format confirmation message
         confirmation = CONFIRMATION_TEMPLATE.format(
