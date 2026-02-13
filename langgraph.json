@@ -1,4 +1,5 @@
 {
+  "dependencies": ["."],
   "graphs": {
     "parking_chatbot": "./src/chatbot/graph.py:graph"
   },

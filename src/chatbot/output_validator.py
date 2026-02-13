@@ -59,6 +59,13 @@ class OutputValidator:
         "hour", "hours", "open", "close", "closed",
         "reservation", "reserve", "book", "booking",
         "downtown", "airport", "plaza", "facility",
+        # Features and amenities
+        "charging", "station", "stations", "ev", "electric",
+        "security", "surveillance", "cctv", "camera",
+        "shuttle", "transport", "access",
+        # Policies and contact
+        "policy", "policies", "contact", "address", "phone", "email",
+        "location", "located", "street", "road",
     }
 
     # Blacklist: if any of these tokens appear the response is rejected

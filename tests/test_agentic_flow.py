@@ -6,6 +6,8 @@ Tests the new assistant node with tool calling capabilities:
 - Multi-turn tool calling
 - Reservation mode switching via tool
 - Multilingual support
+- Intent classification (strict domain constraints)
+- Output validation
 """
 
 import pytest
