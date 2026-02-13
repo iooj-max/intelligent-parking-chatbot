@@ -33,11 +33,13 @@ from src.chatbot.prompts import (
     FIELD_PROMPTS,
     INFO_PROMPT_TEMPLATE,
     INFO_SYSTEM_PROMPT,
+    PARKING_ASSISTANT_CONSTITUTION,
     RESERVATION_SYSTEM_PROMPT,
 )
 from src.chatbot.state import ChatbotState
 from src.config import settings
 from src.guardrails.input_filter import InputValidator
+from src.chatbot.output_validator import OutputValidator
 from src.guardrails.output_filter import OutputFilter
 from src.rag.retriever import ParkingRetriever
 from src.rag.sql_store import SQLStore
@@ -82,7 +84,7 @@ def get_llm() -> ChatOpenAI:
 
 def assistant_node(state: ChatbotState) -> Dict[str, Any]:
     """
-    Assistant node with tool calling capability using LangGraph's ReAct agent.
+    Assistant node with tool calling + output validation.
 
     Replaces old retrieve + generate pattern.
     LLM decides which tools to call and when.
@@ -101,22 +103,8 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
         # Get LLM
         llm = get_llm()
 
-        # Create system message with instructions
-        system_message = SystemMessage(content="""You are a helpful parking assistant for Downtown Plaza and Airport parking facilities.
-
-CRITICAL RULES:
-- ALWAYS use tools to get accurate information - NEVER make up data
-- If user wants to BOOK/RESERVE parking, call start_reservation_process tool
-- Use check_availability for real-time availability
-- Use calculate_parking_cost for pricing questions
-- Use search_parking_info for features, location, policies
-- Use get_facility_hours for operating hours
-
-Available facilities:
-- downtown_plaza: Downtown Plaza Parking (123 Main St)
-- airport_parking: Airport Long-Term Parking (4500 Airport Rd)
-
-Be concise but friendly. If you don't have information, use the appropriate tool.""")
+        # LAYER 2: System prompt with constitution
+        system_message = SystemMessage(content=PARKING_ASSISTANT_CONSTITUTION)
 
         # Create ReAct agent graph
         agent = create_agent(
@@ -146,8 +134,9 @@ Be concise but friendly. If you don't have information, use the appropriate tool
         if not last_ai_message:
             return {"error": "No AI message in agent response"}
 
-        # Check if agent called start_reservation_process
         output = last_ai_message.content
+
+        # Check if agent called start_reservation_process (before validation)
         if "SWITCH_TO_RESERVATION_MODE:" in output:
             parking_id = output.split("SWITCH_TO_RESERVATION_MODE:")[1].strip()
             logger.info(f"Switching to reservation mode for {parking_id}")
@@ -161,7 +150,15 @@ Be concise but friendly. If you don't have information, use the appropriate tool
                 "messages": [AIMessage(content=f"Great! I'll help you reserve parking at {parking_id}. What name should I use for the reservation?")]
             }
 
-        # OUTPUT GUARDRAIL (reuse existing)
+        # LAYER 3: Output validation
+        validator = OutputValidator()
+        validation_result = validator.validate(output)
+
+        if not validation_result["is_valid"]:
+            logger.warning(f"Output rejected: {validation_result['reason']}")
+            return {"messages": [AIMessage(content=validation_result["response"])]}
+
+        # OUTPUT GUARDRAIL: PII filter (reuse existing)
         output_filter = OutputFilter()
         filtered = output_filter.filter_response(output)
 
@@ -181,10 +178,12 @@ Be concise but friendly. If you don't have information, use the appropriate tool
 
 def llm_router(state: ChatbotState) -> Dict[str, Any]:
     """
-    LLM-based semantic routing with guardrails protection.
+    LLM-based semantic routing with STRICT intent classification.
 
-    CRITICAL: NO keyword matching - LLM decides everything.
-    Supports multilingual input naturally.
+    Flow:
+    1. Intent Classifier (FIRST - filters 95% of off-topic)
+    2. InputValidator (injection/PII detection)
+    3. Return mode
 
     Args:
         state: Current chatbot state
@@ -192,6 +191,8 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
     Returns:
         State updates with mode and optional error message
     """
+    from src.chatbot.intent_classifier import IntentClassifier, ParkingIntent
+
     try:
         iteration_count = state.get("iteration_count", 0) + 1
 
@@ -205,7 +206,22 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
         if not last_user_message:
             return {"mode": "info", "iteration_count": iteration_count}
 
-        # GUARDRAILS FIRST - protect from injection/off-topic before routing
+        # LAYER 1: Intent Classification (FIRST GATE)
+        classifier = IntentClassifier()
+        intent = classifier.classify(last_user_message)
+
+        if intent == ParkingIntent.OUT_OF_SCOPE:
+            logger.info("Query rejected by intent classifier (out of scope)")
+            return {
+                "mode": "info",
+                "iteration_count": iteration_count,
+                "messages": [AIMessage(content=(
+                    "I can only help with parking-related questions like availability, "
+                    "pricing, reservations, and operating hours. How can I help with your parking needs?"
+                ))]
+            }
+
+        # LAYER 2: GUARDRAILS - protect from injection/PII after intent check
         validator = InputValidator()
         validation = validator.validate(last_user_message)
 
@@ -218,45 +234,13 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
                 "messages": [AIMessage(content=validation["error_message"])]
             }
 
-        # LLM-based classification (only for validated input)
-        llm = get_llm()
-        routing_prompt = f"""You are a parking chatbot classifier.
-
-Classify the user's intent into ONE category:
-- RESERVATION: User wants to make a parking reservation/booking
-- INFO: User wants information about parking facilities
-
-Examples:
-RESERVATION:
-- "I want to book parking"
-- "Reserve a spot for tomorrow"
-- "Can I park there at 3pm?" (implicit booking)
-- "Забронировать парковку" (Russian: book parking)
-
-INFO:
-- "What are your hours?"
-- "How much does it cost?"
-- "Do you have EV charging?"
-- "I don't want to book anything" (negation)
-
-User message: "{last_user_message}"
-
-Think step by step:
-1. Does the user want to MAKE a reservation/booking?
-2. Or do they just want INFORMATION?
-
-Reply with exactly one word: RESERVATION or INFO"""
-
-        response = llm.invoke([HumanMessage(content=routing_prompt)])
-        intent = response.content.strip().upper()
-
-        if "RESERVATION" in intent:
-            logger.info("LLM classified as RESERVATION mode")
-            # Still return "info" - assistant will call start_reservation_process tool
-            return {"mode": "info", "iteration_count": iteration_count}
-        else:
-            logger.info("LLM classified as INFO mode")
-            return {"mode": "info", "iteration_count": iteration_count}
+        # Valid parking query - proceed to assistant
+        logger.info(f"Intent: {intent.value}, routing to assistant")
+        return {
+            "mode": "info",  # Assistant decides reservation via tool
+            "iteration_count": iteration_count,
+            "parking_intent": intent.value  # Hint for assistant
+        }
 
     except Exception as e:
         logger.error(f"LLM router error: {e}", exc_info=True)

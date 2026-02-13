@@ -79,3 +79,6 @@ class ChatbotState(TypedDict):
 
     # Iteration count for loop prevention (safety mechanism)
     iteration_count: int
+
+    # Intent classification hint from router (e.g., "parking_availability", "reservation")
+    parking_intent: Optional[str]
