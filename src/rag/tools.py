@@ -269,11 +269,54 @@ def start_reservation_process(parking_id: str) -> str:
         return f"Error starting reservation: {exc}"
 
 
+@tool
+def list_all_parking_facilities() -> str:
+    """Get a list of all available parking facilities with basic information.
+
+    Use this tool when the user wants to:
+    - See all available parking options
+    - Compare multiple facilities
+    - Find the cheapest/closest/best parking
+    - Get an overview of what's available
+
+    This is especially useful for queries like "show me all parking options" or
+    "which parking is cheapest" (call this first to get facility IDs, then call
+    calculate_parking_cost for each).
+
+    Returns:
+        A formatted list of all parking facilities with name, address, city,
+        total capacity, and parking_id.
+    """
+    logger.info("Tool list_all_parking_facilities called")
+    try:
+        service = get_parking_service()
+        facilities = service.get_all_facilities()
+
+        if not facilities:
+            return "No parking facilities found in the database."
+
+        lines = ["Available parking facilities:\n"]
+        for facility in facilities:
+            lines.append(f"**{facility.name}**")
+            lines.append(f"  - ID: {facility.parking_id}")
+            lines.append(f"  - Address: {facility.address}, {facility.city}")
+            lines.append(f"  - Total capacity: {facility.total_spaces} spaces")
+            if facility.latitude and facility.longitude:
+                lines.append(f"  - Coordinates: ({float(facility.latitude):.6f}, {float(facility.longitude):.6f})")
+            lines.append("")
+
+        return "\n".join(lines)
+    except Exception as exc:
+        logger.error("list_all_parking_facilities failed: %s", exc, exc_info=True)
+        return f"Error listing parking facilities: {exc}"
+
+
 # ---------------------------------------------------------------------------
 # Exported tool list for binding to the LLM agent
 # ---------------------------------------------------------------------------
 
 PARKING_TOOLS = [
+    list_all_parking_facilities,
     search_parking_info,
     check_availability,
     calculate_parking_cost,

@@ -4,7 +4,7 @@ Data loader script for test parking data.
 This script loads static content into Weaviate and dynamic data into PostgreSQL
 for testing and development purposes.
 
-⚠️ FOR TESTING PURPOSES ONLY - Not production-ready data loader.
+⚠️ MVP only - Not production-ready data loader.
 
 Usage:
     # Load all test data (idempotent)
@@ -50,7 +50,7 @@ class DataLoader:
     Handles loading static markdown content into Weaviate and dynamic CSV data
     into PostgreSQL with idempotent operations.
 
-    ⚠️ FOR TESTING PURPOSES ONLY
+    ⚠️ MVP only
     """
 
     def __init__(self, verbose: bool = False):
@@ -433,7 +433,7 @@ class DataLoader:
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Load test parking data into Weaviate and PostgreSQL.\n\n" "⚠️  FOR TESTING PURPOSES ONLY - Not production-ready.",
+        description="Load test parking data into Weaviate and PostgreSQL.\n\n" "⚠️  MVP only - Not production-ready.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

@@ -28,7 +28,6 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 
 from src.chatbot.prompts import (
-    CANCELLATION_KEYWORDS,
     CONFIRMATION_TEMPLATE,
     FIELD_PROMPTS,
     INFO_PROMPT_TEMPLATE,
@@ -215,18 +214,6 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Router error: {e}", exc_info=True)
         return {"mode": "info", "iteration_count": iteration_count}
-
-
-# Booking keywords for intent detection
-BOOKING_KEYWORDS = [
-    "book",
-    "reserve",
-    "reservation",
-    "make a booking",
-    "schedule",
-    "i want to book",
-    "i'd like to book",
-]
 
 
 def router(state: ChatbotState) -> Dict[str, Any]:
