@@ -29,11 +29,16 @@ class ParkingFacilityService:
 
     def _refresh_cache(self) -> None:
         """Refresh facility cache from database."""
-        with self._sql_store.get_session_context() as session:
+        # Use a plain session for read-only loading to avoid commit-time
+        # expiration that detaches ORM instances from their loaded state.
+        session = self._sql_store.get_session()
+        try:
             facilities = session.query(ParkingFacility).all()
             self._cache = {f.parking_id: f for f in facilities}
             self._cache_timestamp = datetime.now()
             logger.info(f"Loaded {len(self._cache)} parking facilities from database")
+        finally:
+            session.close()
 
     def get_all_facilities(self) -> List[ParkingFacility]:
         """Load all parking facilities from DB."""
