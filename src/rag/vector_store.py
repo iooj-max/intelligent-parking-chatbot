@@ -5,7 +5,7 @@ This module provides a Weaviate client wrapper for managing the ParkingContent
 collection, including schema creation, batch insertion with embeddings, and
 vector similarity search with metadata filtering.
 
-FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+MVP only - Not production-ready implementation.
 """
 
 from typing import Any, Dict, List, Optional
@@ -25,7 +25,7 @@ class WeaviateStore:
     Manages the ParkingContent collection with chunked markdown content,
     embeddings, and metadata for RAG retrieval.
 
-    FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+    MVP only - Not production-ready implementation.
     """
 
     COLLECTION_NAME = "ParkingContent"

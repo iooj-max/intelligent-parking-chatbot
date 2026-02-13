@@ -5,7 +5,7 @@ This module provides SQLAlchemy ORM models and a store class for managing
 dynamic parking data including facilities, working hours, pricing rules,
 special hours, and real-time space availability.
 
-FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+MVP only - Not production-ready implementation.
 """
 
 from contextlib import contextmanager
@@ -179,7 +179,7 @@ class SQLStore:
     Provides connection management, table creation, and CRUD operations
     for parking facilities, hours, pricing, and availability.
 
-    FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+    MVP only - Not production-ready implementation.
     """
 
     def __init__(self, dsn: Optional[str] = None):

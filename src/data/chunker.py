@@ -4,7 +4,7 @@ Markdown text chunking utilities for RAG retrieval.
 This module provides functions to chunk markdown content into semantically
 meaningful pieces for optimal vector embedding and retrieval.
 
-FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+MVP only - Not production-ready implementation.
 """
 
 import re

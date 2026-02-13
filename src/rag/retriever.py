@@ -4,7 +4,7 @@ Unified RAG retriever for parking chatbot.
 This module orchestrates retrieval from Weaviate (static content) and
 PostgreSQL (dynamic data) to provide comprehensive context for LLM responses.
 
-FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+MVP only - Not production-ready implementation.
 """
 
 import logging
@@ -48,67 +48,6 @@ class RetrievalError(Exception):
     pass
 
 
-# Intent classification keywords
-DYNAMIC_KEYWORDS = [
-    "available",
-    "availability",
-    "spaces",
-    "price",
-    "pricing",
-    "cost",
-    "rate",
-    "hours",
-    "open",
-    "close",
-    "closed",
-    "special hours",
-    "holiday",
-    "now",
-    "today",
-    "currently",
-    "real-time",
-    "occupied",
-    "full",
-]
-
-STATIC_KEYWORDS = [
-    "location",
-    "address",
-    "where",
-    "features",
-    "amenities",
-    "electric",
-    "charging",
-    "security",
-    "policy",
-    "policies",
-    "cancel",
-    "refund",
-    "booking process",
-    "how to book",
-    "payment",
-    "accept",
-    "handicap",
-    "accessible",
-    "height",
-    "restriction",
-    "valet",
-    "monthly pass",
-    "contact",
-    "phone",
-    "email",
-    "faq",
-    "question",
-]
-
-RESERVATION_KEYWORDS = [
-    "book a spot",
-    "book parking",
-    "make reservation",
-    "reserve parking",
-    "i want to park",
-    "i want to book",
-]
 
 
 class ParkingRetriever:
@@ -227,36 +166,18 @@ class ParkingRetriever:
 
     def _classify_query_intent(self, query: str) -> QueryIntent:
         """
-        Classify query intent using keyword matching.
+        Classify query intent for RAG retrieval.
+
+        Always returns HYBRID to provide comprehensive context for LLM-based
+        decision making (full ReAct pattern).
 
         Args:
             query: User query
 
         Returns:
-            QueryIntent enum value
+            QueryIntent.HYBRID (always)
         """
-        query_lower = query.lower()
-
-        # Count keyword matches
-        dynamic_count = sum(kw in query_lower for kw in DYNAMIC_KEYWORDS)
-        static_count = sum(kw in query_lower for kw in STATIC_KEYWORDS)
-
-        # Reservation intent takes precedence
-        if any(kw in query_lower for kw in RESERVATION_KEYWORDS):
-            return QueryIntent.RESERVATION
-
-        # If both types present, return HYBRID
-        if dynamic_count > 0 and static_count > 0:
-            return QueryIntent.HYBRID
-
-        # Prefer dynamic if any dynamic keywords present
-        if dynamic_count > 0:
-            return QueryIntent.DYNAMIC
-
-        if static_count > 0:
-            return QueryIntent.STATIC
-
-        # Default to HYBRID (safer to retrieve too much)
+        # Always retrieve hybrid for full LLM-based ReAct pattern
         return QueryIntent.HYBRID
 
     def _infer_parking_id(self, query: str) -> Optional[str]:

@@ -4,7 +4,7 @@ OpenAI embeddings generation utilities.
 This module provides functions to generate embeddings for text chunks
 using OpenAI's embedding models.
 
-FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+MVP only - Not production-ready implementation.
 """
 
 import time
@@ -19,7 +19,7 @@ class EmbeddingGenerator:
     """
     Wrapper for OpenAI embeddings generation with batching and error handling.
 
-    FOR TESTING PURPOSES ONLY - Not production-ready implementation.
+    MVP only - Not production-ready implementation.
     """
 
     def __init__(self, model: str = "text-embedding-3-small", batch_size: int = 100):
