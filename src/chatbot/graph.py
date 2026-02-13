@@ -2,37 +2,52 @@
 LangGraph workflow for parking chatbot.
 
 Defines the StateGraph with nodes and conditional edges for:
-- Information mode: answer questions using RAG
+- Information mode: agentic tool-calling loop (assistant <-> tools)
 - Reservation mode: collect booking details step-by-step
+
+Architecture:
+  Entry: llm_router
+  Info flow:     llm_router -> assistant -> (tools -> assistant)* -> END
+  Reservation:   llm_router -> collect_input -> validate -> check -> confirm -> END
+  Transition:    assistant can switch to collect_input when start_reservation_process is called
 
 The compiled graph is exported as 'graph' for langgraph.json compatibility.
 """
 
 import logging
 
+from langchain_core.messages import AIMessage
 from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
 
 from src.chatbot.nodes import (
+    assistant_node,
+    llm_router,
     check_completion,
     collect_input,
     confirm_reservation,
-    generate,
-    retrieve,
-    router,
+    # generate,  # DEPRECATED - replaced by assistant_node
+    # retrieve,  # DEPRECATED - replaced by assistant_node
     validate_input,
 )
 from src.chatbot.state import ChatbotState
+from src.rag.tools import PARKING_TOOLS
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+# Create tool execution node
+tool_node = ToolNode(PARKING_TOOLS)
 
 # Build the workflow
 workflow = StateGraph(ChatbotState)
 
 # Add all nodes to the graph
-workflow.add_node("router", router)
-workflow.add_node("retrieve", retrieve)
-workflow.add_node("generate", generate)
+workflow.add_node("router", llm_router)
+workflow.add_node("assistant", assistant_node)
+workflow.add_node("tools", tool_node)
+# Removed: workflow.add_node("retrieve", retrieve)
+# Removed: workflow.add_node("generate", generate)
 workflow.add_node("collect_input", collect_input)
 workflow.add_node("validate_input", validate_input)
 workflow.add_node("check_completion", check_completion)
@@ -45,39 +60,68 @@ workflow.set_entry_point("router")
 # Conditional routing functions
 def route_from_router(state: ChatbotState) -> str:
     """
-    Route from router to either retrieve (info mode) or collect_input (reservation mode).
+    Route from router based on mode.
+
+    In info mode, always goes to assistant (which handles tool calling).
+    In reservation mode, goes to collect_input.
+    If the router already added an error message (guardrail rejection), go to END.
 
     Args:
         state: Current chatbot state
 
     Returns:
-        Next node name: "retrieve" or "collect_input"
+        Next node name: "assistant", "collect_input", or END
     """
     mode = state.get("mode", "info")
+
+    # Check if router already added error message (guardrail rejection)
+    messages = state.get("messages", [])
+    if messages and len(messages) > 0:
+        last_msg = messages[-1]
+        if isinstance(last_msg, AIMessage):
+            # Router already handled it (guardrail rejection)
+            logger.info("Router produced AI message (guardrail rejection), routing to END")
+            return END
+
     if mode == "reservation":
         logger.info("Routing to reservation mode (collect_input)")
         return "collect_input"
     else:
-        logger.info("Routing to info mode (retrieve)")
-        return "retrieve"
+        logger.info("Routing to info mode (assistant)")
+        return "assistant"
 
 
-def should_continue_info(state: ChatbotState) -> str:
+def should_continue_assistant(state: ChatbotState) -> str:
     """
-    Check if conversation should continue after generate node.
+    Route based on whether LLM called tools or switched to reservation mode.
 
-    If user's last message contains booking keywords, loop back to router
-    to switch to reservation mode. Otherwise, end conversation.
+    Checks:
+    1. If mode switched to reservation (start_reservation_process was called) -> collect_input
+    2. If assistant made tool calls -> tools (execute them)
+    3. Otherwise -> END (final answer ready)
 
     Args:
         state: Current chatbot state
 
     Returns:
-        Next node name: "router" or END
+        Next node name: "tools", "collect_input", or END
     """
-    # Check if last AI message mentions booking (this would trigger reservation mode)
-    # For now, we just end the turn and let the user's next message trigger router
-    # In a more advanced version, we could detect booking intent in AI's response
+    # Check if mode switched to reservation (start_reservation_process called)
+    mode = state.get("mode", "info")
+    if mode == "reservation":
+        logger.info("Mode switched to reservation, routing to collect_input")
+        return "collect_input"
+
+    # Check if assistant made tool calls
+    messages = state.get("messages", [])
+    if messages and len(messages) > 0:
+        last_message = messages[-1]
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+            logger.info("Assistant made tool calls, routing to tools")
+            return "tools"
+
+    # No tool calls, no mode switch -> final answer
+    logger.info("No tool calls or mode switch, routing to END")
     return END
 
 
@@ -135,21 +179,36 @@ def route_from_completion(state: ChatbotState) -> str:
         return "collect_input"
 
 
-# Add conditional edges
+# --- Conditional edges ---
+
+# Router decides: assistant (info mode) | collect_input (reservation) | END (guardrail)
 workflow.add_conditional_edges(
     "router",
     route_from_router,
     {
-        "retrieve": "retrieve",
+        "assistant": "assistant",
         "collect_input": "collect_input",
+        END: END,
     },
 )
 
-# Info mode flow: retrieve → generate → END
-workflow.add_edge("retrieve", "generate")
-workflow.add_conditional_edges("generate", should_continue_info, {END: END})
+# Agentic tool-calling loop with reservation mode detection
+workflow.add_conditional_edges(
+    "assistant",
+    should_continue_assistant,
+    {
+        "tools": "tools",
+        "collect_input": "collect_input",
+        END: END,
+    },
+)
 
-# Reservation mode flow: collect_input → validate_input → ...
+# After tool execution, loop back to assistant for next decision
+workflow.add_edge("tools", "assistant")
+
+# --- Reservation mode flow (unchanged) ---
+
+# collect_input -> validate_input
 workflow.add_edge("collect_input", "validate_input")
 
 workflow.add_conditional_edges(
