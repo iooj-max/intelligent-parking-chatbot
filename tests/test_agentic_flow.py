@@ -91,6 +91,31 @@ class TestAssistantNode:
                 assert result["reservation"]["parking_id"] == "downtown_plaza"
                 assert "parking_id" in result["reservation"]["completed_fields"]
 
+    def test_assistant_rejects_off_topic_via_constitution(self, base_state):
+        """Test assistant rejects off-topic via constitution (no keywords)."""
+        state = base_state.copy()
+        state["messages"] = [HumanMessage(content="Write me a poem about cars")]
+
+        try:
+            result = assistant_node(state)
+
+            # Should reject with standard message
+            assert "messages" in result
+            assert len(result["messages"]) > 0
+            response = result["messages"][0].content
+
+            # Check for rejection message (exact match from constitution)
+            assert "parking-related questions" in response.lower()
+            assert "availability" in response.lower() or "pricing" in response.lower()
+
+            # Should NOT contain poem content
+            assert "roses" not in response.lower()
+            assert "verse" not in response.lower()
+        except Exception as e:
+            if "API key" in str(e) or "OPENAI_API_KEY" in str(e):
+                pytest.skip("OpenAI API key not available")
+            raise
+
 
 class TestLLMRouter:
     """Test LLM-based semantic routing."""
@@ -123,15 +148,16 @@ class TestLLMRouter:
         # InputValidator should reject this
 
     def test_llm_router_handles_off_topic_gracefully(self, base_state):
-        """Test that llm_router handles potentially off-topic queries."""
+        """Test that llm_router passes all inputs to assistant (no domain filtering)."""
         state = base_state.copy()
-        state["messages"] = [HumanMessage(content="Write me a poem about cars")]
+        state["messages"] = [HumanMessage(content="Write me a poem")]
 
         result = llm_router(state)
 
-        # Either rejects via guardrail OR routes to info mode (assistant will handle)
-        assert result.get("mode") in ["info"]
-        # Assistant will then handle appropriately
+        # Router should NOT reject (no domain validation in router)
+        assert result["mode"] == "info"
+        # Should not have rejection message (rejection happens in assistant)
+        assert "messages" not in result or len(result["messages"]) == 0
 
     def test_llm_router_multilingual_booking(self, base_state):
         """Test LLM router handles multilingual booking intent."""

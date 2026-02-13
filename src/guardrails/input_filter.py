@@ -1,11 +1,13 @@
 """
-Input validation and filtering for chatbot guardrails.
+Input validation and filtering for security guardrails.
 
 Protects against:
 - Prompt injection attempts
-- Off-topic queries
 - PII in user input (logging concern)
 - Malformed input
+
+NOTE: Topic validation (parking vs off-topic) is handled by LLM constitution,
+not keyword matching.
 """
 
 import logging
@@ -15,8 +17,6 @@ from src.guardrails.patterns import (
     CARD_REGEX,
     EMAIL_REGEX,
     INJECTION_REGEX,
-    OFF_TOPIC_KEYWORDS,
-    PARKING_KEYWORDS,
     PHONE_REGEX,
     SSN_REGEX,
 )
@@ -54,63 +54,6 @@ class PromptInjectionDetector:
             "detected": len(patterns_found) > 0,
             "patterns_found": patterns_found,
             "score": score,
-        }
-
-
-class TopicClassifier:
-    """Classify query relevance to parking domain."""
-
-    def is_parking_related(self, text: str) -> Dict[str, Any]:
-        """
-        Check if query is parking-related.
-
-        Args:
-            text: User input to classify
-
-        Returns:
-            {
-                'is_relevant': bool,
-                'parking_score': float,
-                'off_topic_score': float,
-                'reason': str
-            }
-        """
-        text_lower = text.lower()
-
-        # Count parking keywords
-        parking_count = sum(1 for kw in PARKING_KEYWORDS if kw in text_lower)
-
-        # Count off-topic keywords
-        off_topic_count = sum(1 for kw in OFF_TOPIC_KEYWORDS if kw in text_lower)
-
-        # Normalize scores
-        parking_score = min(parking_count / 3.0, 1.0)
-        off_topic_score = min(off_topic_count / 2.0, 1.0)
-
-        # Decision logic
-        if off_topic_count > 0 and parking_count == 0:
-            return {
-                "is_relevant": False,
-                "parking_score": parking_score,
-                "off_topic_score": off_topic_score,
-                "reason": "Query contains off-topic keywords with no parking context",
-            }
-
-        # Be more lenient - only reject long queries with no parking keywords
-        if parking_count == 0 and len(text.split()) > 10:
-            return {
-                "is_relevant": False,
-                "parking_score": parking_score,
-                "off_topic_score": off_topic_score,
-                "reason": "Query lacks parking keywords and appears off-topic",
-            }
-
-        # For shorter queries or those with parking keywords, be permissive
-        return {
-            "is_relevant": True,
-            "parking_score": parking_score,
-            "off_topic_score": off_topic_score,
-            "reason": "Query may be parking-related or requires context",
         }
 
 
@@ -163,14 +106,16 @@ class PIIDetector:
 
 class InputValidator:
     """
-    Orchestrator for all input validation.
+    Orchestrator for security input validation.
 
-    Combines injection detection, topic filtering, and PII detection.
+    Combines injection detection and PII detection.
+
+    NOTE: Topic filtering (parking vs off-topic) is handled by LLM constitution,
+    not keyword matching. This validator only checks SECURITY concerns.
     """
 
     def __init__(self):
         self.injection_detector = PromptInjectionDetector()
-        self.topic_classifier = TopicClassifier()
         self.pii_detector = PIIDetector()
 
     def validate(self, user_input: str) -> Dict[str, Any]:
@@ -210,7 +155,7 @@ class InputValidator:
                 "metadata": {},
             }
 
-        # Injection detection
+        # Injection detection (SECURITY)
         injection_result = self.injection_detector.detect(user_input)
         if injection_result["detected"]:
             logger.warning(
@@ -226,19 +171,7 @@ class InputValidator:
                 "metadata": injection_result,
             }
 
-        # Topic relevance
-        topic_result = self.topic_classifier.is_parking_related(user_input)
-        if not topic_result["is_relevant"]:
-            logger.info(f"Off-topic query rejected: {topic_result['reason']}")
-            return {
-                "is_valid": False,
-                "error_message": "I can only help with parking-related questions. Please ask about parking availability, pricing, hours, or reservations.",
-                "warnings": [topic_result["reason"]],
-                "sanitized_input": user_input,
-                "metadata": topic_result,
-            }
-
-        # PII detection (warning only, not blocking)
+        # PII detection (SECURITY - warning only, not blocking)
         pii_result = self.pii_detector.detect_pii(user_input)
         if pii_result["found"]:
             logger.warning(f"PII detected in user input: {pii_result['types']}")
@@ -251,7 +184,6 @@ class InputValidator:
             "sanitized_input": pii_result["sanitized_text"],
             "metadata": {
                 "injection": injection_result,
-                "topic": topic_result,
                 "pii": pii_result,
             },
         }

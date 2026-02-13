@@ -39,7 +39,6 @@ from src.chatbot.prompts import (
 from src.chatbot.state import ChatbotState
 from src.config import settings
 from src.guardrails.input_filter import InputValidator
-from src.chatbot.output_validator import OutputValidator
 from src.guardrails.output_filter import OutputFilter
 from src.rag.retriever import ParkingRetriever
 from src.rag.sql_store import SQLStore
@@ -136,7 +135,7 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
 
         output = last_ai_message.content
 
-        # Check if agent called start_reservation_process (before validation)
+        # Check if agent called start_reservation_process
         if "SWITCH_TO_RESERVATION_MODE:" in output:
             parking_id = output.split("SWITCH_TO_RESERVATION_MODE:")[1].strip()
             logger.info(f"Switching to reservation mode for {parking_id}")
@@ -150,15 +149,7 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
                 "messages": [AIMessage(content=f"Great! I'll help you reserve parking at {parking_id}. What name should I use for the reservation?")]
             }
 
-        # LAYER 3: Output validation
-        validator = OutputValidator()
-        validation_result = validator.validate(output)
-
-        if not validation_result["is_valid"]:
-            logger.warning(f"Output rejected: {validation_result['reason']}")
-            return {"messages": [AIMessage(content=validation_result["response"])]}
-
-        # OUTPUT GUARDRAIL: PII filter (reuse existing)
+        # OUTPUT GUARDRAIL: PII filter only (security, not domain validation)
         output_filter = OutputFilter()
         filtered = output_filter.filter_response(output)
 
@@ -178,21 +169,17 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
 
 def llm_router(state: ChatbotState) -> Dict[str, Any]:
     """
-    LLM-based semantic routing with STRICT intent classification.
+    Minimal router with security guardrails only.
 
-    Flow:
-    1. Intent Classifier (FIRST - filters 95% of off-topic)
-    2. InputValidator (injection/PII detection)
-    3. Return mode
+    Domain validation happens in assistant node via constitution.
+    LLM decides if query is parking-related.
 
     Args:
         state: Current chatbot state
 
     Returns:
-        State updates with mode and optional error message
+        State updates with mode
     """
-    from src.chatbot.intent_classifier import IntentClassifier, ParkingIntent
-
     try:
         iteration_count = state.get("iteration_count", 0) + 1
 
@@ -206,45 +193,27 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
         if not last_user_message:
             return {"mode": "info", "iteration_count": iteration_count}
 
-        # LAYER 1: Intent Classification (FIRST GATE)
-        classifier = IntentClassifier()
-        intent = classifier.classify(last_user_message)
-
-        if intent == ParkingIntent.OUT_OF_SCOPE:
-            logger.info("Query rejected by intent classifier (out of scope)")
-            return {
-                "mode": "info",
-                "iteration_count": iteration_count,
-                "messages": [AIMessage(content=(
-                    "I can only help with parking-related questions like availability, "
-                    "pricing, reservations, and operating hours. How can I help with your parking needs?"
-                ))]
-            }
-
-        # LAYER 2: GUARDRAILS - protect from injection/PII after intent check
+        # SECURITY GUARDRAILS ONLY (not domain validation)
         validator = InputValidator()
         validation = validator.validate(last_user_message)
 
         if not validation["is_valid"]:
-            logger.warning(f"Input rejected by guardrails: {validation['error_message']}")
-            # Return error message directly, don't route
+            logger.warning(f"Security violation: {validation['error_message']}")
             return {
                 "mode": "info",
                 "iteration_count": iteration_count,
                 "messages": [AIMessage(content=validation["error_message"])]
             }
 
-        # Valid parking query - proceed to assistant
-        logger.info(f"Intent: {intent.value}, routing to assistant")
+        # All valid inputs go to assistant (LLM decides domain relevance)
+        logger.info("Input passed security checks, routing to assistant")
         return {
-            "mode": "info",  # Assistant decides reservation via tool
-            "iteration_count": iteration_count,
-            "parking_intent": intent.value  # Hint for assistant
+            "mode": "info",
+            "iteration_count": iteration_count
         }
 
     except Exception as e:
-        logger.error(f"LLM router error: {e}", exc_info=True)
-        # No fallback to keywords - just default to info mode
+        logger.error(f"Router error: {e}", exc_info=True)
         return {"mode": "info", "iteration_count": iteration_count}
 
 

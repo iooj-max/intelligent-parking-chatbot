@@ -1,10 +1,12 @@
 """
-Regex patterns for guardrail detection.
+Regex patterns for security guardrails.
 
 Contains compiled patterns for:
 - Prompt injection detection
-- Topic classification
 - PII detection (emails, phones, SSNs, credit cards)
+
+NOTE: Domain validation (parking vs off-topic) is handled by LLM constitution,
+not keyword matching. This file contains ONLY security patterns.
 """
 
 import re
@@ -23,55 +25,6 @@ INJECTION_PATTERNS = [
     r';?\s*union\s+select',
     r'<script>',
     r'javascript:',
-]
-
-# TOPIC KEYWORDS FOR PARKING DOMAIN
-# Keywords that indicate parking-related queries
-PARKING_KEYWORDS = [
-    'parking',
-    'park',
-    'space',
-    'spot',
-    'lot',
-    'garage',
-    'facility',
-    'available',
-    'availability',
-    'hours',
-    'open',
-    'close',
-    'price',
-    'cost',
-    'rate',
-    'fee',
-    'book',
-    'reserve',
-    'reservation',
-    'location',
-    'address',
-    'downtown',
-    'airport',
-    'long-term',
-    'short-term',
-]
-
-# OFF-TOPIC KEYWORDS
-# Keywords that indicate queries outside parking domain
-OFF_TOPIC_KEYWORDS = [
-    'cryptocurrency',
-    'bitcoin',
-    'politics',
-    'election',
-    'religion',
-    'medical',
-    'health',
-    'diagnosis',
-    'legal',
-    'lawyer',
-    'financial advice',
-    'investment',
-    'stock',
-    'trading',
 ]
 
 # PII PATTERNS
