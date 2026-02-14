@@ -4,16 +4,9 @@ Node implementations for LangGraph chatbot workflow.
 Nodes are pure functions that take ChatbotState and return state updates.
 Each node is responsible for a specific part of the conversation flow:
 
-New agentic nodes:
-- assistant_node: Tool-calling agent that replaces retrieve + generate
-- llm_router: LLM-based semantic routing with guardrails
-
-Deprecated nodes (kept for backward compatibility):
-- router: Classify user intent (info vs reservation) - use llm_router() instead
-- retrieve: Get RAG context from ParkingRetriever - use assistant_node() instead
-- generate: Generate LLM response using context - use assistant_node() instead
-
-Active reservation nodes:
+Active nodes:
+- assistant_node: Tool-calling agent for parking workflows
+- llm_router: Security-focused router for incoming user messages
 - collect_input: Determine next field to collect in reservation mode
 - validate_input: Validate user input for reservation fields
 - check_completion: Check if all reservation fields collected
@@ -30,45 +23,22 @@ from langchain_openai import ChatOpenAI
 from src.chatbot.prompts import (
     CONFIRMATION_TEMPLATE,
     FIELD_PROMPTS,
-    INFO_PROMPT_TEMPLATE,
-    INFO_SYSTEM_PROMPT,
     PARKING_ASSISTANT_CONSTITUTION,
 )
 from src.chatbot.state import ChatbotState
 from src.config import settings
 from src.guardrails.input_filter import InputValidator
 from src.guardrails.output_filter import OutputFilter
-from src.rag.retriever import ParkingRetriever
-from src.rag.sql_store import SQLStore
-from src.rag.vector_store import WeaviateStore
-from src.data.embeddings import EmbeddingGenerator
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# Initialize RAG dependencies (singleton pattern)
-_retriever = None
+# Initialize LLM dependency (singleton pattern)
 _llm = None
 
 # Keywords kept for backward-compatible deprecated router()
 BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "парков", "заброни"]
 CANCELLATION_KEYWORDS = ["cancel", "stop", "no", "отмен", "не надо"]
-
-
-def get_parking_retriever() -> ParkingRetriever:
-    """Get or create ParkingRetriever singleton."""
-    global _retriever
-    if _retriever is None:
-        vector_store = WeaviateStore()
-        sql_store = SQLStore()
-        embedding_generator = EmbeddingGenerator()
-        _retriever = ParkingRetriever(vector_store, sql_store, embedding_generator)
-
-        # Register cleanup on process exit to prevent memory leaks
-        import atexit
-        atexit.register(lambda: vector_store.close())
-        atexit.register(lambda: sql_store.engine.dispose())
-    return _retriever
 
 
 def get_llm() -> ChatOpenAI:
@@ -217,194 +187,6 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Router error: {e}", exc_info=True)
         return {"mode": "info", "iteration_count": iteration_count}
-
-
-def router(state: ChatbotState) -> Dict[str, Any]:
-    """DEPRECATED - Use llm_router() instead for LLM-based semantic routing.
-
-    Route user to info or reservation mode based on intent.
-
-    Logic:
-    - If last message contains booking keywords → "reservation"
-    - If already in reservation mode and not cancelled → stay in "reservation"
-    - Otherwise → "info"
-
-    Args:
-        state: Current chatbot state
-
-    Returns:
-        State updates with mode set
-    """
-    logger.warning("router() is deprecated - use llm_router() instead")
-    try:
-        # Increment iteration count for loop prevention
-        iteration_count = state.get("iteration_count", 0) + 1
-
-        # Check for cancellation keywords
-        if state["messages"]:
-            last_user_message = None
-            # Find last human message
-            for msg in reversed(state["messages"]):
-                if isinstance(msg, HumanMessage):
-                    last_user_message = msg.content.lower()
-                    break
-
-            if last_user_message:
-                # Check for cancellation
-                if any(keyword in last_user_message for keyword in CANCELLATION_KEYWORDS):
-                    logger.info("User requested cancellation, switching to info mode")
-                    return {
-                        "mode": "info",
-                        "iteration_count": iteration_count,
-                        "reservation": {
-                            "completed_fields": [],
-                            "validation_errors": {},
-                        },
-                    }
-
-                # Check for booking intent
-                if any(keyword in last_user_message for keyword in BOOKING_KEYWORDS):
-                    logger.info("Detected booking intent, switching to reservation mode")
-                    return {"mode": "reservation", "iteration_count": iteration_count}
-
-        # Stay in current mode if already in reservation mode
-        if state.get("mode") == "reservation":
-            return {"mode": "reservation", "iteration_count": iteration_count}
-
-        # Default to info mode
-        return {"mode": "info", "iteration_count": iteration_count}
-
-    except Exception as e:
-        logger.error(f"Error in router node: {e}")
-        return {"error": f"Router error: {str(e)}", "iteration_count": iteration_count}
-
-
-def retrieve(state: ChatbotState) -> Dict[str, Any]:
-    """DEPRECATED - Use assistant_node() instead which handles retrieval via tool calls.
-
-    Retrieve context from ParkingRetriever for user query.
-
-    Args:
-        state: Current chatbot state
-
-    Returns:
-        State updates with context and intent from retriever
-    """
-    logger.warning("retrieve() is deprecated - use assistant_node() instead")
-    try:
-        # Get last user message
-        last_user_message = None
-        for msg in reversed(state["messages"]):
-            if isinstance(msg, HumanMessage):
-                last_user_message = msg.content
-                break
-
-        if not last_user_message:
-            logger.warning("No user message found in retrieve node")
-            return {"error": "No user message to retrieve context for"}
-
-        # INPUT GUARDRAIL: Validate user input
-        validator = InputValidator()
-        validation = validator.validate(last_user_message)
-
-        if not validation["is_valid"]:
-            logger.warning(f"Input rejected: {validation['error_message']}")
-            return {
-                "messages": [AIMessage(content=validation["error_message"])],
-                "error": validation["error_message"],
-            }
-
-        # Call retriever
-        retriever = get_parking_retriever()
-        result = retriever.retrieve(
-            query=last_user_message, return_format="structured"
-        )
-
-        logger.info(f"Retrieved context for query: {last_user_message[:50]}...")
-
-        return {
-            "context": result.context_string,
-            "intent": result.intent.value if result.intent else None,
-        }
-
-    except Exception as e:
-        logger.error(f"Error in retrieve node: {e}")
-        # Graceful degradation - continue without context
-        return {
-            "context": "I'm having trouble accessing the parking database right now. Please try again later.",
-            "error": f"Retrieval error: {str(e)}",
-        }
-
-
-def generate(state: ChatbotState) -> Dict[str, Any]:
-    """DEPRECATED - Use assistant_node() instead which handles generation via tool-calling agent.
-
-    Generate LLM response using retrieved context.
-
-    Args:
-        state: Current chatbot state with context
-
-    Returns:
-        State updates with AI message added
-    """
-    logger.warning("generate() is deprecated - use assistant_node() instead")
-    try:
-        # Get last user message with explicit None handling
-        last_user_message = None
-        for msg in reversed(state["messages"]):
-            if isinstance(msg, HumanMessage):
-                last_user_message = msg.content
-                break
-
-        if not last_user_message or last_user_message.strip() == "":
-            logger.warning("No valid user message found in generate node")
-            return {
-                "messages": [AIMessage(content="I didn't receive a clear question. Could you please rephrase?")],
-                "error": "No user message found"
-            }
-
-        # Get context from state
-        context = state.get("context", "No context available")
-
-        # Format prompt with context
-        user_prompt = INFO_PROMPT_TEMPLATE.format(
-            context=context, query=last_user_message
-        )
-
-        # Get LLM
-        llm = get_llm()
-
-        # Generate response
-        messages = [
-            {"role": "system", "content": INFO_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
-
-        response = llm.invoke(messages)
-
-        # OUTPUT GUARDRAIL: Filter response for PII
-        output_filter = OutputFilter()
-        filtered = output_filter.filter_response(response.content)
-
-        final_content = filtered["filtered_response"]
-
-        logger.info("Generated LLM response")
-        if filtered["pii_found"]:
-            logger.warning(f"PII masked in response: {filtered['pii_found']}")
-
-        # Return AI message to be added to state
-        return {"messages": [AIMessage(content=final_content)]}
-
-    except Exception as e:
-        logger.error(f"Error in generate node: {e}")
-        return {
-            "messages": [
-                AIMessage(
-                    content="I'm sorry, I'm having trouble generating a response right now. Please try again."
-                )
-            ],
-            "error": f"Generation error: {str(e)}",
-        }
 
 
 def collect_input(state: ChatbotState) -> Dict[str, Any]:

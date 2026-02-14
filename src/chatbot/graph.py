@@ -26,8 +26,6 @@ from src.chatbot.nodes import (
     check_completion,
     collect_input,
     confirm_reservation,
-    # generate,  # DEPRECATED - replaced by assistant_node
-    # retrieve,  # DEPRECATED - replaced by assistant_node
     validate_input,
 )
 from src.chatbot.state import ChatbotState
@@ -46,8 +44,6 @@ workflow = StateGraph(ChatbotState)
 workflow.add_node("router", llm_router)
 workflow.add_node("assistant", assistant_node)
 workflow.add_node("tools", tool_node)
-# Removed: workflow.add_node("retrieve", retrieve)
-# Removed: workflow.add_node("generate", generate)
 workflow.add_node("collect_input", collect_input)
 workflow.add_node("validate_input", validate_input)
 workflow.add_node("check_completion", check_completion)

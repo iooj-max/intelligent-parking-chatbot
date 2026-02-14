@@ -83,8 +83,8 @@ class RAGEvaluator:
             if source_file:
                 doc_ids.append(source_file)
 
-        # dynamic results are not ranked docs; include parking_id as facility-level signal
-        if result.dynamic_data and result.parking_id:
+        # include inferred parking_id as a facility-level relevance signal
+        if result.parking_id:
             doc_ids.append(result.parking_id)
 
         # dedupe while preserving order

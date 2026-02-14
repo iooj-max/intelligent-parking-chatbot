@@ -19,7 +19,6 @@ def test_rag_evaluator_extracts_static_and_dynamic_ids():
             {"source_file": "data/static/downtown_plaza/location.md"},
             {"source_file": "data/static/downtown_plaza/features.md"},
         ],
-        dynamic_data={"availability": {"available_spaces": 10}},
         parking_id="downtown_plaza",
     )
 
@@ -34,7 +33,7 @@ def test_rag_evaluator_extracts_static_and_dynamic_ids():
 
 
 def test_rag_evaluator_metrics_are_calculated_correctly():
-    evaluator = RAGEvaluator(DummyRetriever(SimpleNamespace(static_chunks=[], dynamic_data={}, parking_id=None)))
+    evaluator = RAGEvaluator(DummyRetriever(SimpleNamespace(static_chunks=[], parking_id=None)))
 
     retrieved = ["a", "b", "c", "d"]
     relevant = ["b", "e"]

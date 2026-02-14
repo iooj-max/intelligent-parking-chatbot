@@ -91,8 +91,6 @@ class AnswerEvaluator:
         state: ChatbotState = {
             'messages': [HumanMessage(content=question)],
             'mode': 'info',
-            'intent': None,
-            'context': None,
             'reservation': {'completed_fields': [], 'validation_errors': {}},
             'error': None,
             'iteration_count': 0,
