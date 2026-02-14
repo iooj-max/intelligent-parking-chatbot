@@ -1,18 +1,16 @@
-"""
-Evaluation infrastructure for parking chatbot.
+"""Evaluation infrastructure for parking chatbot."""
 
-Provides:
-- RAG retrieval quality metrics (recall, precision, MRR)
-- Answer quality metrics (faithfulness, relevance via RAGAS)
-- Performance benchmarks (latency, throughput)
-"""
+from importlib import import_module
+from typing import Any
 
-from .evaluate_rag import RAGEvaluator
-from .evaluate_answers import AnswerEvaluator
-from .performance import PerformanceTester
+__all__ = ["RAGEvaluator", "AnswerEvaluator", "PerformanceTester"]
 
-__all__ = [
-    "RAGEvaluator",
-    "AnswerEvaluator",
-    "PerformanceTester",
-]
+
+def __getattr__(name: str) -> Any:
+    if name == "RAGEvaluator":
+        return import_module(".evaluate_rag", __name__).RAGEvaluator
+    if name == "AnswerEvaluator":
+        return import_module(".evaluate_answers", __name__).AnswerEvaluator
+    if name == "PerformanceTester":
+        return import_module(".performance", __name__).PerformanceTester
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

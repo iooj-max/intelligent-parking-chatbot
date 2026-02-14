@@ -66,7 +66,7 @@ class ParkingRetriever:
 
             if not static_chunks:
                 logger.warning("No results found for query: %s", query)
-                return self._format_empty_result(query, parking_id)
+                return self._format_empty_result(query, parking_id, return_format)
 
             context_string = self._format_context_string(static_chunks, parking_id)
 
@@ -161,7 +161,21 @@ class ParkingRetriever:
 
         return context
 
-    def _format_empty_result(self, query: str, parking_id: Optional[str]) -> str:
+    def _format_empty_result(
+        self,
+        query: str,
+        parking_id: Optional[str],
+        return_format: str,
+    ) -> Union[str, RetrievalResult]:
+        if return_format != "string":
+            return RetrievalResult(
+                query=query,
+                parking_id=parking_id,
+                static_chunks=[],
+                context_string="",
+                metadata=self._extract_metadata([]),
+            )
+
         if parking_id:
             return (
                 f"I couldn't find relevant information for '{query}' at {parking_id}. "
