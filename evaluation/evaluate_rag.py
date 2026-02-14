@@ -11,10 +11,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
-if TYPE_CHECKING:
-    from src.rag.retriever import ParkingRetriever, RetrievalResult
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

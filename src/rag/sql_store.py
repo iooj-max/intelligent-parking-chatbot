@@ -30,7 +30,6 @@ from sqlalchemy import (
     Time,
     UniqueConstraint,
     create_engine,
-    event,
     text,
 )
 from sqlalchemy.ext.declarative import declarative_base

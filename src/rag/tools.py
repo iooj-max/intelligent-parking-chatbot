@@ -19,7 +19,7 @@ from src.data.embeddings import EmbeddingGenerator
 from src.rag.retriever import ParkingRetriever
 from src.rag.sql_store import SQLStore
 from src.rag.vector_store import WeaviateStore
-from src.services.parking_service import ParkingFacilityService, get_parking_service
+from src.services.parking_service import get_parking_service
 
 logger = logging.getLogger(__name__)
 

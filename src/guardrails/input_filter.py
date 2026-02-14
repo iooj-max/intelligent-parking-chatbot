@@ -11,7 +11,7 @@ not keyword matching.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from src.guardrails.patterns import (
     CARD_REGEX,

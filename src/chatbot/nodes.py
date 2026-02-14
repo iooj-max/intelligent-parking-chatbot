@@ -21,7 +21,7 @@ Active reservation nodes:
 """
 
 import logging
-from datetime import date, datetime, time
+from datetime import datetime
 from typing import Any, Dict
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -33,7 +33,6 @@ from src.chatbot.prompts import (
     INFO_PROMPT_TEMPLATE,
     INFO_SYSTEM_PROMPT,
     PARKING_ASSISTANT_CONSTITUTION,
-    RESERVATION_SYSTEM_PROMPT,
 )
 from src.chatbot.state import ChatbotState
 from src.config import settings
@@ -50,6 +49,10 @@ logger = logging.getLogger(__name__)
 # Initialize RAG dependencies (singleton pattern)
 _retriever = None
 _llm = None
+
+# Keywords kept for backward-compatible deprecated router()
+BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "парков", "заброни"]
+CANCELLATION_KEYWORDS = ["cancel", "stop", "no", "отмен", "не надо"]
 
 
 def get_parking_retriever() -> ParkingRetriever:
