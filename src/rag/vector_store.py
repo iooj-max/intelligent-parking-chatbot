@@ -275,12 +275,16 @@ class WeaviateStore:
                 where_filter = where_filter & f
 
         # Execute search
-        response = collection.query.near_vector(
-            near_vector=query_vector,
-            limit=limit,
-            where=where_filter,
-            return_metadata=MetadataQuery(distance=True) if return_metadata else None,
-        )
+        query_kwargs = {
+            "near_vector": query_vector,
+            "limit": limit,
+            "return_metadata": MetadataQuery(distance=True) if return_metadata else None,
+        }
+
+        if where_filter is not None:
+            query_kwargs["filters"] = where_filter
+
+        response = collection.query.near_vector(**query_kwargs)
 
         # Format results
         results = []
