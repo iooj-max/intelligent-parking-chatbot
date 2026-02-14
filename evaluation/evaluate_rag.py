@@ -76,6 +76,10 @@ class RAGEvaluator:
 
     def _extract_doc_ids(self, result) -> List[str]:
         """Extract document IDs from structured retrieval output in rank order."""
+        if not hasattr(result, "static_chunks"):
+            logger.warning("Unexpected retrieval result type: %s", type(result).__name__)
+            return []
+
         doc_ids: List[str] = []
 
         for chunk in result.static_chunks:
