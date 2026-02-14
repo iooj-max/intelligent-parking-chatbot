@@ -24,12 +24,12 @@ import argparse
 import csv
 import logging
 import sys
-from datetime import date, datetime, time
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-from .chunker import chunk_text_smart, extract_content_type_from_filename, prepare_chunk_for_insertion
+from .chunker import chunk_text_smart, prepare_chunk_for_insertion
 from .embeddings import EmbeddingGenerator
 from ..rag.sql_store import SQLStore
 from ..rag.vector_store import WeaviateStore
@@ -210,7 +210,7 @@ class DataLoader:
             # Verify final count
             final_count = store.count_objects()
             logger.info(f"\n{'=' * 70}")
-            logger.info(f"STATIC DATA LOAD COMPLETE")
+            logger.info("STATIC DATA LOAD COMPLETE")
             logger.info(f"Total chunks in Weaviate: {final_count}")
             logger.info(f"{'=' * 70}\n")
 
@@ -309,7 +309,7 @@ class DataLoader:
                 raise
 
         logger.info(f"\n{'=' * 70}")
-        logger.info(f"DYNAMIC DATA LOAD COMPLETE")
+        logger.info("DYNAMIC DATA LOAD COMPLETE")
         for table, count in counts.items():
             logger.info(f"  {table}: {count} records")
         logger.info(f"{'=' * 70}\n")
