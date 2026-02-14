@@ -81,18 +81,29 @@ docker compose up -d
 # python -m src.data.loader   # re-load data after volume wipe
 ```
 
-### Running tests and evaluation
+### Running tests and evaluation (updated)
+
+> Evaluation depends on external services (OpenAI + Weaviate + PostgreSQL).
+> Before running evaluation, make sure infra is up and test data is loaded.
 
 ```bash
-# Run all tests
-pytest
+# 0) Activate environment
+source .venv/bin/activate
 
-# Run a specific test file
-pytest tests/test_rag.py
+# 1) Unit/regression tests for guardrails and evaluation helpers
+OPENAI_API_KEY=sk-test-key PYTHONPATH=. pytest -q tests/test_output_filter.py tests/test_evaluation_metrics.py
 
-# Run evaluation and generate report
-python -m evaluation.evaluate_rag
+# 2) Retrieval-quality evaluation (Recall@K, Precision@K, MRR)
+python -m evaluation.evaluate_rag --dataset evaluation/datasets/rag_test_cases.json --k 5
+
+# 3) Answer-quality evaluation (RAGAS faithfulness/relevancy)
+python -m evaluation.evaluate_answers --dataset evaluation/datasets/answer_test_cases.json
+
+# 4) Performance benchmarking (latency p50/p95/p99 + throughput/QPS)
+python -m evaluation.performance --dataset evaluation/datasets/answer_test_cases.json --iterations 3 --concurrent 5
 ```
+
+Evaluation outputs are saved to `evaluation/results/`.
 
 ---
 
@@ -183,4 +194,4 @@ SELECT * FROM pricing_rules;
 
 **Import errors:**
 - Reinstall the project: `pip install -e ".[dev]"`
-- Verify you're in the virtual environment: `which python` should show `.venv` 
+- Verify you're in the virtual environment: `which python` should show `.venv`

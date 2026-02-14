@@ -36,7 +36,7 @@ EMAIL_PATTERN = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
 # Phone pattern: matches US phone numbers with various formats
 # Examples: 555-1234, (555) 123-4567, +1-555-123-4567
 # Also matches 7-digit local numbers: 555-1234
-PHONE_PATTERN = r'(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\b\d{3}[-.\s]?\d{4}\b'
+PHONE_PATTERN = r'(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\b\d{3}[-.\s]?\d{4}\b'
 
 # SSN pattern: matches social security numbers (XXX-XX-XXXX)
 # Uses word boundaries to avoid false positives with dates
