@@ -36,6 +36,10 @@ logger = logging.getLogger(__name__)
 # Initialize LLM dependency (singleton pattern)
 _llm = None
 
+# Keywords kept for backward-compatible deprecated router()
+BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "парков", "заброни"]
+CANCELLATION_KEYWORDS = ["cancel", "stop", "no", "отмен", "не надо"]
+
 
 def get_llm() -> ChatOpenAI:
     """Get or create ChatOpenAI singleton."""
