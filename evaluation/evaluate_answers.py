@@ -8,19 +8,44 @@ Metrics:
 
 import json
 import logging
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy
+from ragas.metrics._faithfulness import Faithfulness
+from ragas.metrics._answer_relevance import AnswerRelevancy
+from ragas.embeddings import OpenAIEmbeddings as RagasOpenAIEmbeddings
+from ragas.llms import llm_factory
+from openai import OpenAI
 from datasets import Dataset
 
 from src.chatbot.graph import graph
 from src.chatbot.state import ChatbotState
+from src.config import settings
+from src.rag.tools import get_retriever
 
 logger = logging.getLogger(__name__)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="ragas")
+warnings.filterwarnings("ignore", category=ResourceWarning, module="ragas")
+
+
+class RagasEmbeddingsAdapter:
+    """
+    Adapter to provide embed_query/embed_documents for RAGAS metrics.
+    Wraps RAGAS OpenAI embeddings which expose embed_text/embed_texts.
+    """
+
+    def __init__(self, embeddings: RagasOpenAIEmbeddings):
+        self._embeddings = embeddings
+
+    def embed_query(self, text: str):
+        return self._embeddings.embed_text(text)
+
+    def embed_documents(self, texts: list[str]):
+        return self._embeddings.embed_texts(texts)
 
 
 class AnswerEvaluator:
@@ -29,7 +54,36 @@ class AnswerEvaluator:
     """
 
     def __init__(self):
-        self.metrics = [faithfulness, answer_relevancy]
+        self.embeddings = RagasOpenAIEmbeddings(
+            client=OpenAI(api_key=settings.openai_api_key),
+            model="text-embedding-3-small",
+        )
+        self.embeddings_adapter = RagasEmbeddingsAdapter(self.embeddings)
+        self.llm = llm_factory(
+            model="gpt-4o-mini",
+            provider="openai",
+            client=OpenAI(api_key=settings.openai_api_key),
+        )
+        self.metrics = [
+            Faithfulness(llm=self.llm),
+            AnswerRelevancy(llm=self.llm, embeddings=self.embeddings_adapter),
+        ]
+        self.retriever = get_retriever()
+
+    def _to_scalar(self, value: Any) -> float:
+        """Convert RAGAS metric outputs to a single float."""
+        if isinstance(value, (int, float)):
+            return float(value)
+        if hasattr(value, "tolist"):
+            value = value.tolist()
+        if isinstance(value, (list, tuple)):
+            if not value:
+                return 0.0
+            if len(value) == 1:
+                return float(value[0])
+            return float(sum(value) / len(value))
+        # Fallback: try direct float conversion
+        return float(value)
 
     def evaluate_answer(
         self,
@@ -61,11 +115,11 @@ class AnswerEvaluator:
         dataset = Dataset.from_dict(data)
 
         # Run RAGAS evaluation
-        results = evaluate(dataset, metrics=self.metrics)
+        results = evaluate(dataset, metrics=self.metrics, embeddings=self.embeddings)
 
         return {
-            'faithfulness': results['faithfulness'],
-            'answer_relevancy': results['answer_relevancy'],
+            'faithfulness': self._to_scalar(results['faithfulness']),
+            'answer_relevancy': self._to_scalar(results['answer_relevancy']),
         }
 
     def evaluate_with_chatbot(
@@ -101,6 +155,9 @@ class AnswerEvaluator:
         # Extract answer and context
         answer = result['messages'][-1].content
         context = result.get('context', '')
+        if not context:
+            # Fallback: build context via retriever for evaluation
+            context = self.retriever.retrieve(question, return_format="string")
 
         # Evaluate
         scores = self.evaluate_answer(question, answer, context)

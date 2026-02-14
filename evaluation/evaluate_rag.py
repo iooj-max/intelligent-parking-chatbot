@@ -60,15 +60,19 @@ class RAGEvaluator:
     def evaluate_query(self, query: str, relevant_ids: List[str], k: int = 5) -> Dict[str, Any]:
         result = self.retriever.retrieve(query=query, return_format="structured")
         retrieved_ids = self._extract_doc_ids(result)
+        norm_retrieved_ids = [self._normalize_id(i) for i in retrieved_ids]
+        norm_relevant_ids = [self._normalize_id(i) for i in relevant_ids]
 
-        recall = self.calculate_recall_at_k(retrieved_ids, relevant_ids, k)
-        precision = self.calculate_precision_at_k(retrieved_ids, relevant_ids, k)
-        mrr = self.calculate_mrr(retrieved_ids, relevant_ids)
+        recall = self.calculate_recall_at_k(norm_retrieved_ids, norm_relevant_ids, k)
+        precision = self.calculate_precision_at_k(norm_retrieved_ids, norm_relevant_ids, k)
+        mrr = self.calculate_mrr(norm_retrieved_ids, norm_relevant_ids)
 
         return {
             "query": query,
             "retrieved_ids": retrieved_ids,
             "relevant_ids": relevant_ids,
+            "normalized_retrieved_ids": norm_retrieved_ids,
+            "normalized_relevant_ids": norm_relevant_ids,
             f"recall@{k}": recall,
             f"precision@{k}": precision,
             "mrr": mrr,
@@ -86,6 +90,9 @@ class RAGEvaluator:
             source_file = chunk.get("source_file")
             if source_file:
                 doc_ids.append(source_file)
+            chunk_parking_id = chunk.get("parking_id")
+            if chunk_parking_id:
+                doc_ids.append(chunk_parking_id)
 
         # include inferred parking_id as a facility-level relevance signal
         if result.parking_id:
@@ -100,6 +107,15 @@ class RAGEvaluator:
                 ordered_unique.append(item)
 
         return ordered_unique
+
+    def _normalize_id(self, doc_id: str) -> str:
+        """Normalize IDs to improve match between dataset paths and stored filenames."""
+        if not doc_id:
+            return doc_id
+        # If dataset provides a path, compare on basename to match Weaviate source_file.
+        if "/" in doc_id:
+            return doc_id.rsplit("/", 1)[-1]
+        return doc_id
 
     def evaluate_dataset(self, test_cases: List[Dict[str, Any]], k: int = 5) -> Dict[str, Any]:
         per_query_results = []
