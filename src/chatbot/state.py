@@ -65,12 +65,6 @@ class ChatbotState(TypedDict):
     # Current conversation mode: "info" or "reservation"
     mode: str
 
-    # Query intent from retriever (STATIC, DYNAMIC, HYBRID, RESERVATION)
-    intent: Optional[str]
-
-    # Retrieved context from RAG (passed from retrieve → generate nodes)
-    context: Optional[str]
-
     # Reservation data (only used in reservation mode)
     reservation: ReservationData
 
@@ -80,5 +74,3 @@ class ChatbotState(TypedDict):
     # Iteration count for loop prevention (safety mechanism)
     iteration_count: int
 
-    # Intent classification hint from router (e.g., "parking_availability", "reservation")
-    parking_intent: Optional[str]

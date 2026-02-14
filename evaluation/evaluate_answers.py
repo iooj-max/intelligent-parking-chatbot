@@ -91,8 +91,6 @@ class AnswerEvaluator:
         state: ChatbotState = {
             'messages': [HumanMessage(content=question)],
             'mode': 'info',
-            'intent': None,
-            'context': None,
             'reservation': {'completed_fields': [], 'validation_errors': {}},
             'error': None,
             'iteration_count': 0,
@@ -198,7 +196,7 @@ def main():
     results = evaluator.evaluate_dataset(test_cases)
 
     # Print summary
-    print(f"\n=== Answer Quality Results ===")
+    print("\n=== Answer Quality Results ===")
     print(f"Number of questions: {results['num_questions']}")
     print(f"Avg Faithfulness: {results['avg_faithfulness']:.3f}")
     print(f"Avg Relevancy: {results['avg_answer_relevancy']:.3f}")

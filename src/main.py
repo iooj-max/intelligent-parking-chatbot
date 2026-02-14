@@ -59,8 +59,6 @@ def main():
     state: ChatbotState = {
         "messages": [],
         "mode": "info",
-        "intent": None,
-        "context": None,
         "reservation": {
             "completed_fields": [],
             "validation_errors": {},

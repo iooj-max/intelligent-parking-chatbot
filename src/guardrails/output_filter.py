@@ -5,7 +5,7 @@ Masks or blocks sensitive data (PII) in LLM-generated responses.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from src.guardrails.patterns import (
     CARD_REGEX,

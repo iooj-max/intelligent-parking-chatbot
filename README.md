@@ -86,20 +86,30 @@ docker compose up -d
 > Evaluation depends on external services (OpenAI + Weaviate + PostgreSQL).
 > Before running evaluation, make sure infra is up and test data is loaded.
 
+`smoke_test.py` is a unified local health-check runner for quick pre-commit/pre-PR validation:
+- `--profile simple`: minimal fast checks (lint + `tests/test_output_filter.py`)
+- `--profile smoke` (default): broader deterministic checks (adds `tests/test_evaluation_metrics.py`)
+
+It also sets safe defaults for `PYTHONPATH` and `OPENAI_API_KEY` to reduce environment-related false failures in local runs.
+
 ```bash
 # 0) Activate environment
 source .venv/bin/activate
 
-# 1) Unit/regression tests for guardrails and evaluation helpers
+# 1) Unified local checks (deterministic, no DB/Weaviate required)
+python smoke_test.py --profile simple
+python smoke_test.py
+
+# 2) Unit/regression tests for guardrails and evaluation helpers
 OPENAI_API_KEY=sk-test-key PYTHONPATH=. pytest -q tests/test_output_filter.py tests/test_evaluation_metrics.py
 
-# 2) Retrieval-quality evaluation (Recall@K, Precision@K, MRR)
+# 3) Retrieval-quality evaluation (Recall@K, Precision@K, MRR)
 python -m evaluation.evaluate_rag --dataset evaluation/datasets/rag_test_cases.json --k 5
 
-# 3) Answer-quality evaluation (RAGAS faithfulness/relevancy)
+# 4) Answer-quality evaluation (RAGAS faithfulness/relevancy)
 python -m evaluation.evaluate_answers --dataset evaluation/datasets/answer_test_cases.json
 
-# 4) Performance benchmarking (latency p50/p95/p99 + throughput/QPS)
+# 5) Performance benchmarking (latency p50/p95/p99 + throughput/QPS)
 python -m evaluation.performance --dataset evaluation/datasets/answer_test_cases.json --iterations 3 --concurrent 5
 ```
 
