@@ -8,6 +8,7 @@ Profiles:
 import argparse
 import os
 import subprocess
+import sys
 
 
 def run(cmd: list[str], env: dict[str, str]) -> bool:
@@ -20,9 +21,10 @@ def run(cmd: list[str], env: dict[str, str]) -> bool:
 
 
 def build_checks(profile: str) -> dict[str, list[str]]:
+    python = sys.executable
     base = {
-        "ruff": ["ruff", "check", "src", "evaluation", "tests"],
-        "output filter": ["pytest", "tests/test_output_filter.py", "-q"],
+        "ruff": [python, "-m", "ruff", "check", "src", "evaluation", "tests"],
+        "output filter": [python, "-m", "pytest", "tests/test_output_filter.py", "-q"],
     }
 
     if profile == "simple":
@@ -30,7 +32,7 @@ def build_checks(profile: str) -> dict[str, list[str]]:
 
     return {
         **base,
-        "evaluation metrics": ["pytest", "tests/test_evaluation_metrics.py", "-q"],
+        "evaluation metrics": [python, "-m", "pytest", "tests/test_evaluation_metrics.py", "-q"],
     }
 
 
