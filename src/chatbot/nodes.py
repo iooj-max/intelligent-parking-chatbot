@@ -23,7 +23,9 @@ from langchain_openai import ChatOpenAI
 from src.chatbot.prompts import (
     CONFIRMATION_TEMPLATE,
     FIELD_PROMPTS,
+    INFO_PROMPT_TEMPLATE,
     PARKING_ASSISTANT_CONSTITUTION,
+    STRICT_INFO_SYSTEM_PROMPT,
 )
 from src.chatbot.state import ChatbotState
 from src.config import settings
@@ -37,8 +39,24 @@ logger = logging.getLogger(__name__)
 _llm = None
 
 # Keywords kept for backward-compatible deprecated router()
-BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "парков", "заброни"]
+BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "заброни", "брон", "резерв"]
 CANCELLATION_KEYWORDS = ["cancel", "stop", "no", "отмен", "не надо"]
+
+# Simple keyword-based detection for parking-related queries
+PARKING_KEYWORDS = [
+    "parking", "park", "lot", "garage", "valet",
+    "parking lot", "parking garage",
+    "парков", "стоянк", "паркинг", "парковка", "парковать", "парковка",
+    "места", "место", "паркомест",
+    "цена", "стоим", "тариф", "оплат",
+    "час", "режим", "время", "график",
+    "бронир", "резерв",
+    "авто", "машин", "транспорт", "автобус", "rv", "bus", "truck",
+]
+
+AVAILABILITY_KEYWORDS = ["available", "availability", "free spots", "spaces", "свобод", "налич", "мест"]
+PRICING_KEYWORDS = ["price", "cost", "rate", "pricing", "стоим", "цена", "тариф", "сколько"]
+HOURS_KEYWORDS = ["hours", "open", "close", "schedule", "время", "час", "график", "работает"]
 
 
 def get_llm() -> ChatOpenAI:
@@ -74,6 +92,90 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
         # Get LLM
         llm = get_llm()
 
+        # Get current messages
+        messages = state.get("messages", [])
+
+        # If llm_router marked the request as parking-related data request,
+        # fetch data first and answer strictly from data.
+        if state.get("force_info"):
+            from langchain_core.messages import SystemMessage, HumanMessage
+            from src.rag.tools import (
+                search_parking_info,
+                check_availability,
+                calculate_parking_cost,
+                get_facility_hours,
+            )
+            from src.services.parking_matcher import ParkingFacilityMatcher
+            from src.services.parking_service import get_parking_service
+
+            # Extract last user message
+            last_user_message = None
+            for msg in reversed(messages):
+                if isinstance(msg, HumanMessage):
+                    last_user_message = msg.content
+                    break
+
+            query = last_user_message or ""
+
+            # Infer parking_id (best-effort)
+            parking_id = None
+            try:
+                service = get_parking_service()
+                matcher = ParkingFacilityMatcher(threshold=0.6)
+                facilities = service.get_all_facilities()
+                matches = matcher.match_facility(query, facilities, limit=1)
+                if matches:
+                    parking_id = matches[0]["parking_id"]
+            except Exception:
+                parking_id = None
+
+            data_blocks = []
+            data_blocks.append(
+                "## Static Info (search_parking_info)\n"
+                + search_parking_info.invoke({"query": query, "parking_id": parking_id})
+            )
+
+            lower_q = query.lower()
+            if parking_id and any(k in lower_q for k in AVAILABILITY_KEYWORDS):
+                data_blocks.append(
+                    "## Availability\n"
+                    + check_availability.invoke({"parking_id": parking_id})
+                )
+            if parking_id and any(k in lower_q for k in HOURS_KEYWORDS):
+                data_blocks.append(
+                    "## Operating Hours\n"
+                    + get_facility_hours.invoke({"parking_id": parking_id})
+                )
+            # Pricing requires duration; only attempt if a number is present
+            if parking_id and any(k in lower_q for k in PRICING_KEYWORDS):
+                import re
+                m = re.search(r"(\\d+)", lower_q)
+                if m:
+                    duration_hours = int(m.group(1))
+                    data_blocks.append(
+                        "## Pricing\n"
+                        + calculate_parking_cost.invoke(
+                            {"parking_id": parking_id, "duration_hours": duration_hours}
+                        )
+                    )
+
+            context = "\n\n".join(data_blocks)
+            strict_user = INFO_PROMPT_TEMPLATE.format(context=context, query=query)
+            strict_messages = [
+                SystemMessage(content=STRICT_INFO_SYSTEM_PROMPT),
+                HumanMessage(content=strict_user),
+            ]
+
+            response = llm.invoke(strict_messages)
+            output = response.content
+
+            output_filter = OutputFilter()
+            filtered = output_filter.filter_response(output)
+            if filtered["pii_found"]:
+                logger.warning(f"PII masked in response: {filtered['pii_found']}")
+
+            return {"messages": [AIMessage(content=filtered["filtered_response"])]}
+
         # LAYER 2: System prompt with constitution
         system_message = SystemMessage(content=PARKING_ASSISTANT_CONSTITUTION)
 
@@ -83,9 +185,6 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
             tools=PARKING_TOOLS,
             system_prompt=system_message
         )
-
-        # Get current messages
-        messages = state.get("messages", [])
 
         # Invoke agent with full message history
         result = agent.invoke({"messages": messages})
@@ -177,11 +276,25 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
                 "messages": [AIMessage(content=validation["error_message"])]
             }
 
-        # All valid inputs go to assistant (LLM decides domain relevance)
+        # Lightweight parking-related detection to avoid premature out-of-scope refusals
+        lower_msg = last_user_message.lower()
+        is_parking_related = any(k in lower_msg for k in PARKING_KEYWORDS)
+        is_booking = any(k in lower_msg for k in BOOKING_KEYWORDS)
+
+        if not is_parking_related:
+            logger.info("Input not parking-related by keyword check, routing to END with rejection")
+            return {
+                "mode": "info",
+                "iteration_count": iteration_count,
+                "messages": [AIMessage(content="I can only help with parking-related questions like availability, pricing, reservations, and operating hours. How can I help with your parking needs?")],
+            }
+
+        # Parking-related: force info flow for data requests (non-booking)
         logger.info("Input passed security checks, routing to assistant")
         return {
             "mode": "info",
-            "iteration_count": iteration_count
+            "iteration_count": iteration_count,
+            "force_info": not is_booking,
         }
 
     except Exception as e:
