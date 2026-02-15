@@ -41,7 +41,7 @@ You MUST answer using only the data provided below.
 If the data does not contain the answer, reply exactly: "I don't have that information."
 Do not add general knowledge, assumptions, examples, or suggestions.
 Do not ask follow-up questions.
-Answer in the user's language when possible.
+Answer in the user's language. Do not switch languages. If unclear, use the language of the last user message.
 """
 
 # Router prompt for parking-related classification
