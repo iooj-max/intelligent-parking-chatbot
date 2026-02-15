@@ -17,7 +17,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from src.chatbot.prompts import (
@@ -25,6 +25,7 @@ from src.chatbot.prompts import (
     FIELD_PROMPTS,
     INFO_PROMPT_TEMPLATE,
     PARKING_ASSISTANT_CONSTITUTION,
+    ROUTER_SYSTEM_PROMPT,
     STRICT_INFO_SYSTEM_PROMPT,
 )
 from src.chatbot.state import ChatbotState
@@ -41,18 +42,6 @@ _llm = None
 # Keywords kept for backward-compatible deprecated router()
 BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "заброни", "брон", "резерв"]
 CANCELLATION_KEYWORDS = ["cancel", "stop", "no", "отмен", "не надо"]
-
-# Simple keyword-based detection for parking-related queries
-PARKING_KEYWORDS = [
-    "parking", "park", "lot", "garage", "valet",
-    "parking lot", "parking garage",
-    "парков", "стоянк", "паркинг", "парковка", "парковать", "парковка",
-    "места", "место", "паркомест",
-    "цена", "стоим", "тариф", "оплат",
-    "час", "режим", "время", "график",
-    "бронир", "резерв",
-    "авто", "машин", "транспорт", "автобус", "rv", "bus", "truck",
-]
 
 AVAILABILITY_KEYWORDS = ["available", "availability", "free spots", "spaces", "свобод", "налич", "мест"]
 PRICING_KEYWORDS = ["price", "cost", "rate", "pricing", "стоим", "цена", "тариф", "сколько"]
@@ -276,25 +265,49 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
                 "messages": [AIMessage(content=validation["error_message"])]
             }
 
-        # Lightweight parking-related detection to avoid premature out-of-scope refusals
-        lower_msg = last_user_message.lower()
-        is_parking_related = any(k in lower_msg for k in PARKING_KEYWORDS)
-        is_booking = any(k in lower_msg for k in BOOKING_KEYWORDS)
+        # LLM-based routing for parking-related queries
+        llm = get_llm()
+        router_messages = [
+            SystemMessage(content=ROUTER_SYSTEM_PROMPT),
+            HumanMessage(content=last_user_message),
+        ]
 
-        if not is_parking_related:
-            logger.info("Input not parking-related by keyword check, routing to END with rejection")
+        try:
+            router_response = llm.invoke(router_messages).content
+        except Exception as e:
+            logger.error(f"Router LLM error: {e}", exc_info=True)
+            router_response = ""
+
+        parking_related = True
+        needs_data = True
+        intent = "info"
+
+        try:
+            import json
+            parsed = json.loads(router_response)
+            parking_related = bool(parsed.get("parking_related", True))
+            needs_data = bool(parsed.get("needs_data", True))
+            intent = parsed.get("intent", "info")
+        except Exception:
+            # Default to in-scope + data lookup to avoid false refusals
+            parking_related = True
+            needs_data = True
+            intent = "info"
+
+        if not parking_related:
+            logger.info("Input not parking-related by LLM router, routing to END with rejection")
             return {
                 "mode": "info",
                 "iteration_count": iteration_count,
                 "messages": [AIMessage(content="I can only help with parking-related questions like availability, pricing, reservations, and operating hours. How can I help with your parking needs?")],
             }
 
-        # Parking-related: force info flow for data requests (non-booking)
+        # Parking-related: force info flow for data requests (non-reservation)
         logger.info("Input passed security checks, routing to assistant")
         return {
             "mode": "info",
             "iteration_count": iteration_count,
-            "force_info": not is_booking,
+            "force_info": bool(needs_data) and intent != "reservation",
         }
 
     except Exception as e:
