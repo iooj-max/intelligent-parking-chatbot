@@ -23,6 +23,7 @@ from langgraph.prebuilt import ToolNode
 from src.chatbot.nodes import (
     assistant_node,
     llm_router,
+    strict_answer_node,
     check_completion,
     collect_input,
     confirm_reservation,
@@ -43,6 +44,7 @@ workflow = StateGraph(ChatbotState)
 # Add all nodes to the graph
 workflow.add_node("router", llm_router)
 workflow.add_node("assistant", assistant_node)
+workflow.add_node("strict_answer", strict_answer_node)
 workflow.add_node("tools", tool_node)
 workflow.add_node("collect_input", collect_input)
 workflow.add_node("validate_input", validate_input)
@@ -116,7 +118,12 @@ def should_continue_assistant(state: ChatbotState) -> str:
             logger.info("Assistant made tool calls, routing to tools")
             return "tools"
 
-    # No tool calls, no mode switch -> final answer
+    # No tool calls, no mode switch -> strict answer if in info_strict mode
+    logger.info("mode=%s", mode)
+    if mode == "info_strict":
+        logger.info("No tool calls in info_strict mode, routing to strict_answer")
+        return "strict_answer"
+
     logger.info("No tool calls or mode switch, routing to END")
     return END
 
@@ -195,12 +202,16 @@ workflow.add_conditional_edges(
     {
         "tools": "tools",
         "collect_input": "collect_input",
+        "strict_answer": "strict_answer",
         END: END,
     },
 )
 
 # After tool execution, loop back to assistant for next decision
 workflow.add_edge("tools", "assistant")
+
+# Strict answer always terminates
+workflow.add_edge("strict_answer", END)
 
 # --- Reservation mode flow (unchanged) ---
 

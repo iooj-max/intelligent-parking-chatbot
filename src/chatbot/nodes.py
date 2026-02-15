@@ -17,7 +17,9 @@ import logging
 from datetime import datetime
 from typing import Any, Dict
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
 from src.chatbot.prompts import (
@@ -38,14 +40,11 @@ logger = logging.getLogger(__name__)
 
 # Initialize LLM dependency (singleton pattern)
 _llm = None
+_router_llm = None
 
 # Keywords kept for backward-compatible deprecated router()
 BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "заброни", "брон", "резерв"]
 CANCELLATION_KEYWORDS = ["cancel", "stop", "no", "отмен", "не надо"]
-
-AVAILABILITY_KEYWORDS = ["available", "availability", "free spots", "spaces", "свобод", "налич", "мест"]
-PRICING_KEYWORDS = ["price", "cost", "rate", "pricing", "стоим", "цена", "тариф", "сколько"]
-HOURS_KEYWORDS = ["hours", "open", "close", "schedule", "время", "час", "график", "работает"]
 
 
 def get_llm() -> ChatOpenAI:
@@ -58,6 +57,24 @@ def get_llm() -> ChatOpenAI:
             temperature=0.7,
         )
     return _llm
+
+
+def get_router_llm():
+    """LLM for routing decisions with structured output."""
+    global _router_llm
+    if _router_llm is None:
+        _router_llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key=settings.openai_api_key,
+            temperature=0,
+        )
+    return _router_llm
+
+
+class RouterDecision(BaseModel):
+    parking_related: bool = True
+    needs_data: bool = True
+    intent: str = "info"
 
 
 def assistant_node(state: ChatbotState) -> Dict[str, Any]:
@@ -83,87 +100,6 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
 
         # Get current messages
         messages = state.get("messages", [])
-
-        # If llm_router marked the request as parking-related data request,
-        # fetch data first and answer strictly from data.
-        if state.get("force_info"):
-            from langchain_core.messages import SystemMessage, HumanMessage
-            from src.rag.tools import (
-                search_parking_info,
-                check_availability,
-                calculate_parking_cost,
-                get_facility_hours,
-            )
-            from src.services.parking_matcher import ParkingFacilityMatcher
-            from src.services.parking_service import get_parking_service
-
-            # Extract last user message
-            last_user_message = None
-            for msg in reversed(messages):
-                if isinstance(msg, HumanMessage):
-                    last_user_message = msg.content
-                    break
-
-            query = last_user_message or ""
-
-            # Infer parking_id (best-effort)
-            parking_id = None
-            try:
-                service = get_parking_service()
-                matcher = ParkingFacilityMatcher(threshold=0.6)
-                facilities = service.get_all_facilities()
-                matches = matcher.match_facility(query, facilities, limit=1)
-                if matches:
-                    parking_id = matches[0]["parking_id"]
-            except Exception:
-                parking_id = None
-
-            data_blocks = []
-            data_blocks.append(
-                "## Static Info (search_parking_info)\n"
-                + search_parking_info.invoke({"query": query, "parking_id": parking_id})
-            )
-
-            lower_q = query.lower()
-            if parking_id and any(k in lower_q for k in AVAILABILITY_KEYWORDS):
-                data_blocks.append(
-                    "## Availability\n"
-                    + check_availability.invoke({"parking_id": parking_id})
-                )
-            if parking_id and any(k in lower_q for k in HOURS_KEYWORDS):
-                data_blocks.append(
-                    "## Operating Hours\n"
-                    + get_facility_hours.invoke({"parking_id": parking_id})
-                )
-            # Pricing requires duration; only attempt if a number is present
-            if parking_id and any(k in lower_q for k in PRICING_KEYWORDS):
-                import re
-                m = re.search(r"(\\d+)", lower_q)
-                if m:
-                    duration_hours = int(m.group(1))
-                    data_blocks.append(
-                        "## Pricing\n"
-                        + calculate_parking_cost.invoke(
-                            {"parking_id": parking_id, "duration_hours": duration_hours}
-                        )
-                    )
-
-            context = "\n\n".join(data_blocks)
-            strict_user = INFO_PROMPT_TEMPLATE.format(context=context, query=query)
-            strict_messages = [
-                SystemMessage(content=STRICT_INFO_SYSTEM_PROMPT),
-                HumanMessage(content=strict_user),
-            ]
-
-            response = llm.invoke(strict_messages)
-            output = response.content
-
-            output_filter = OutputFilter()
-            filtered = output_filter.filter_response(output)
-            if filtered["pii_found"]:
-                logger.warning(f"PII masked in response: {filtered['pii_found']}")
-
-            return {"messages": [AIMessage(content=filtered["filtered_response"])]}
 
         # LAYER 2: System prompt with constitution
         system_message = SystemMessage(content=PARKING_ASSISTANT_CONSTITUTION)
@@ -217,13 +153,62 @@ def assistant_node(state: ChatbotState) -> Dict[str, Any]:
             logger.warning(f"PII masked in response: {filtered['pii_found']}")
 
         # Return only the new AI message (not all messages)
-        return {"messages": [AIMessage(content=filtered["filtered_response"])]}
+        return {"messages": [AIMessage(content=filtered["filtered_response"])], "mode": state.get("mode", "info")}
 
     except Exception as e:
         logger.error(f"Error in assistant_node: {e}", exc_info=True)
         return {
             "messages": [AIMessage(content="I'm sorry, I encountered an error. Please try again.")],
             "error": f"Assistant error: {str(e)}"
+        }
+
+
+def strict_answer_node(state: ChatbotState) -> Dict[str, Any]:
+    """
+    Produce a strict answer using ONLY tool outputs from the latest turn.
+    If no information is present, return a fixed refusal.
+    """
+    try:
+        llm = get_llm()
+        messages = state.get("messages", [])
+
+        # Find last user message index
+        last_user_idx = None
+        for i in range(len(messages) - 1, -1, -1):
+            if isinstance(messages[i], HumanMessage):
+                last_user_idx = i
+                break
+
+        last_user_message = messages[last_user_idx].content if last_user_idx is not None else ""
+
+        # Collect tool outputs after last user message
+        tool_outputs = []
+        if last_user_idx is not None:
+            for msg in messages[last_user_idx + 1:]:
+                if isinstance(msg, ToolMessage) and msg.content:
+                    tool_outputs.append(msg.content)
+
+        context = "\n\n".join(tool_outputs)
+        strict_user = INFO_PROMPT_TEMPLATE.format(context=context, query=last_user_message)
+        strict_messages = [
+            SystemMessage(content=STRICT_INFO_SYSTEM_PROMPT),
+            HumanMessage(content=strict_user),
+        ]
+
+        response = llm.invoke(strict_messages)
+        output = response.content
+
+        output_filter = OutputFilter()
+        filtered = output_filter.filter_response(output)
+        if filtered["pii_found"]:
+            logger.warning(f"PII masked in response: {filtered['pii_found']}")
+
+        return {"messages": [AIMessage(content=filtered["filtered_response"])], "mode": "info"}
+    except Exception as e:
+        logger.error(f"Error in strict_answer_node: {e}", exc_info=True)
+        return {
+            "messages": [AIMessage(content="I'm sorry, I encountered an error. Please try again.")],
+            "error": f"Strict answer error: {str(e)}"
         }
 
 
@@ -265,30 +250,24 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
                 "messages": [AIMessage(content=validation["error_message"])]
             }
 
-        # LLM-based routing for parking-related queries
-        llm = get_llm()
+        # LLM-based routing for parking-related queries (structured output)
+        router_llm = get_router_llm().with_structured_output(RouterDecision)
         router_messages = [
             SystemMessage(content=ROUTER_SYSTEM_PROMPT),
             HumanMessage(content=last_user_message),
         ]
-
-        try:
-            router_response = llm.invoke(router_messages).content
-        except Exception as e:
-            logger.error(f"Router LLM error: {e}", exc_info=True)
-            router_response = ""
 
         parking_related = True
         needs_data = True
         intent = "info"
 
         try:
-            import json
-            parsed = json.loads(router_response)
-            parking_related = bool(parsed.get("parking_related", True))
-            needs_data = bool(parsed.get("needs_data", True))
-            intent = parsed.get("intent", "info")
-        except Exception:
+            decision = router_llm.invoke(router_messages)
+            parking_related = bool(decision.parking_related)
+            needs_data = bool(decision.needs_data)
+            intent = decision.intent or "info"
+        except Exception as e:
+            logger.error(f"Router LLM error: {e}", exc_info=True)
             # Default to in-scope + data lookup to avoid false refusals
             parking_related = True
             needs_data = True
@@ -304,10 +283,14 @@ def llm_router(state: ChatbotState) -> Dict[str, Any]:
 
         # Parking-related: force info flow for data requests (non-reservation)
         logger.info("Input passed security checks, routing to assistant")
+        logger.info(
+            "Router decision: parking_related=%s needs_data=%s intent=%s",
+            parking_related, needs_data, intent
+        )
+        mode = "reservation" if intent == "reservation" else "info_strict"
         return {
-            "mode": "info",
+            "mode": mode,
             "iteration_count": iteration_count,
-            "force_info": bool(needs_data) and intent != "reservation",
         }
 
     except Exception as e:

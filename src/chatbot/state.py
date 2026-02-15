@@ -73,6 +73,3 @@ class ChatbotState(TypedDict):
 
     # Iteration count for loop prevention (safety mechanism)
     iteration_count: int
-
-    # Force strict info answering using tool data
-    force_info: bool
