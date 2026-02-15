@@ -133,7 +133,7 @@ class ParkingRetriever:
             current_tokens = 0
 
             for i, chunk in enumerate(static_chunks, start=1):
-                content = chunk.get("text", "")
+                content = chunk.get("content", "")
                 metadata = chunk.get("metadata", {})
 
                 chunk_tokens = self._estimate_tokens(content)
@@ -145,7 +145,7 @@ class ParkingRetriever:
                     break
 
                 source_file = chunk.get("source_file", "unknown")
-                content_type = metadata.get("content_type", "general")
+                content_type = chunk.get("content_type", "general")
 
                 sections.append(f"### Chunk {i} ({content_type})")
                 sections.append(f"Source: `{source_file}`")
@@ -203,9 +203,9 @@ class ParkingRetriever:
             ),
             "content_types": list(
                 {
-                    chunk.get("metadata", {}).get("content_type")
+                    chunk.get("content_type")
                     for chunk in static_chunks
-                    if chunk.get("metadata", {}).get("content_type")
+                    if chunk.get("content_type")
                 }
             ),
         }
@@ -213,7 +213,7 @@ class ParkingRetriever:
         parking_facilities = {}
         for chunk in static_chunks:
             chunk_metadata = chunk.get("metadata", {})
-            parking_id = chunk_metadata.get("parking_id")
+            parking_id = chunk.get("parking_id")
             if parking_id and parking_id not in parking_facilities:
                 parking_facilities[parking_id] = {
                     "name": chunk_metadata.get("parking_name"),

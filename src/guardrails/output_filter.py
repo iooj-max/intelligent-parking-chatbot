@@ -37,19 +37,19 @@ class PIIMasker:
         pii_found = []
         masked_text = text
 
-        # Email masking
-        emails = EMAIL_REGEX.findall(text)
-        if emails:
-            for email in emails:
-                pii_found.append({"type": "email", "value": email})
-            masked_text = EMAIL_REGEX.sub("[EMAIL]", masked_text)
+        # Email masking (disabled for now; allow support contact info in responses)
+        # emails = EMAIL_REGEX.findall(text)
+        # if emails:
+        #     for email in emails:
+        #         pii_found.append({"type": "email", "value": email})
+        #     masked_text = EMAIL_REGEX.sub("[EMAIL]", masked_text)
 
-        # Phone masking
-        phones = PHONE_REGEX.findall(text)
-        if phones:
-            for phone in phones:
-                pii_found.append({"type": "phone", "value": phone})
-            masked_text = PHONE_REGEX.sub("[PHONE]", masked_text)
+        # Phone masking (disabled for now; allow support contact info in responses)
+        # phones = PHONE_REGEX.findall(text)
+        # if phones:
+        #     for phone in phones:
+        #         pii_found.append({"type": "phone", "value": phone})
+        #     masked_text = PHONE_REGEX.sub("[PHONE]", masked_text)
 
         # SSN masking
         ssns = SSN_REGEX.findall(text)
