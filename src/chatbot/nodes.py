@@ -42,9 +42,6 @@ logger = logging.getLogger(__name__)
 _llm = None
 _router_llm = None
 
-# Keywords kept for backward-compatible deprecated router()
-BOOKING_KEYWORDS = ["book", "booking", "reserve", "reservation", "заброни", "брон", "резерв"]
-CANCELLATION_KEYWORDS = ["cancel", "stop", "no", "отмен", "не надо"]
 
 
 def get_llm() -> ChatOpenAI:
