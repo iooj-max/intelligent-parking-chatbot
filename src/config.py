@@ -57,6 +57,20 @@ class Settings(BaseSettings):
     weaviate_max_chunks_per_source: int = Field(default=1, validation_alias="WEAVIATE_MAX_CHUNKS_PER_SOURCE")
     weaviate_query_alpha: float = Field(default=0.5, validation_alias="WEAVIATE_QUERY_ALPHA")
 
+    # MCP (reservation status storage)
+    mcp_filesystem_url: str = Field(
+        default="http://localhost:8081/mcp",
+        validation_alias="MCP_FILESYSTEM_URL",
+    )
+    mcp_filesystem_timeout_seconds: float = Field(
+        default=30.0,
+        validation_alias="MCP_FILESYSTEM_TIMEOUT_SECONDS",
+    )
+    mcp_reservation_status_dir: str = Field(
+        default="/projects/reservation_status",
+        validation_alias="MCP_RESERVATION_STATUS_DIR",
+    )
+
     @property
     def postgres_dsn(self) -> str:
         encoded_user = quote_plus(self.postgres_user)

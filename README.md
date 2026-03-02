@@ -81,11 +81,12 @@ All infrastructure runs in Docker. The data loader and LangGraph Studio run loca
 
 | Service      | Image / Build | Purpose                                                                 |
 |-------------|---------------|-------------------------------------------------------------------------|
+| **mcp-filesystem** | node:20-alpine (`mcp-proxy` + `@modelcontextprotocol/server-filesystem`) | MCP filesystem endpoint for reservation status file writes |
 | **postgres** | postgres:16-alpine | PostgreSQL: parking facilities, availability, pricing, working hours |
 | **weaviate** | semitechnologies/weaviate:1.28.4 | Vector DB: static content (policies, FAQ, location, features) |
 | **parking-bot** | Built from project | Telegram bot: LangGraph agent, connects to postgres and weaviate   |
 
-Ports: Postgres `5432`, Weaviate REST `8080`, Weaviate gRPC `50051`.
+Ports: MCP filesystem `8081` (internal endpoint `/mcp`), Postgres `5432`, Weaviate REST `8080`, Weaviate gRPC `50051`.
 
 ### Initial Startup
 
@@ -96,7 +97,10 @@ docker compose up -d
 # 2) Load test data (runs locally, connects to Docker)
 .venv/bin/python -m src.data.loader
 
-# 3) Start the bot
+# 3) Start or refresh all services, including MCP filesystem
+docker compose up -d
+
+# 4) Start the bot (rebuild when code changed)
 docker compose up -d parking-bot --build
 ```
 
@@ -163,6 +167,11 @@ Create `.env` in the project root; use `.env.example` as reference.
 Required for runtime:
 - `TELEGRAM_BOT_TOKEN` — token from BotFather
 - `OPENAI_API_KEY` — for LLM and embeddings
+
+MCP storage integration:
+- `MCP_FILESYSTEM_URL` — MCP streamable HTTP endpoint for filesystem tool calls (example: `http://localhost:8081/mcp`)
+- `MCP_FILESYSTEM_TIMEOUT_SECONDS` — timeout for MCP tool calls
+- `MCP_RESERVATION_STATUS_DIR` — allowed directory inside MCP filesystem server for reservation status logs
 
 ---
 

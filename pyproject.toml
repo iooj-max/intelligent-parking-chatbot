@@ -20,6 +20,7 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "sqlalchemy>=2.0.0",
     "weaviate-client>=4.10.2",
+    "mcp>=1.13.0",
     "langgraph-cli[inmem]",
     "python-telegram-bot>=22.5",
 ]

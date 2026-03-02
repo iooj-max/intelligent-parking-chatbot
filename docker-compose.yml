@@ -1,4 +1,16 @@
 services:
+  mcp-filesystem:
+    image: node:20-alpine
+    command:
+      - sh
+      - -c
+      - >
+        npx -y mcp-proxy --port 8081 --server stream --streamEndpoint /mcp --stateless --
+        npx -y @modelcontextprotocol/server-filesystem /projects/reservation_status
+    volumes:
+      - ./runtime/reservation_status:/projects/reservation_status
+    restart: unless-stopped
+
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.28.4
     hostname: node1
@@ -30,6 +42,7 @@ services:
   parking-bot:
     build: .
     depends_on:
+      - mcp-filesystem
       - postgres
       - weaviate
     env_file: .env
@@ -38,4 +51,6 @@ services:
       WEAVIATE_URL: http://weaviate:8080
       WEAVIATE_HTTP_HOST: weaviate
       WEAVIATE_GRPC_HOST: weaviate
+      MCP_FILESYSTEM_URL: http://mcp-filesystem:8081/mcp
+      MCP_RESERVATION_STATUS_DIR: /projects/reservation_status
     restart: unless-stopped

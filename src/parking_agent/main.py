@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import warnings
-from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 from uuid import uuid4
@@ -24,6 +23,12 @@ from telegram.ext import MessageHandler  # pyright: ignore[reportMissingImports]
 from telegram.ext import filters  # pyright: ignore[reportMissingImports]
 
 from parking_agent.graph import GraphState, build_graph
+from parking_agent.mcp_reservation_status import (
+    append_reservation_status,
+    get_latest_reservation_status,
+    reservation_is_pending,
+)
+from parking_agent.schemas import ReservationData
 from parking_agent.utils import message_content_to_text
 from src.config import settings
 
@@ -112,10 +117,6 @@ def _invoke_graph_for_text(
     return response_text, handoff_to_reservation, should_create_pending_file, reservation
 
 
-def _status_file_path(status_dir: Path, thread_id: str) -> Path:
-    return status_dir / f"{thread_id}.txt"
-
-
 def _format_admin_reservation_message(reservation: dict[str, Any]) -> str:
     """Format reservation details for admin review message in English."""
     lines = ["New parking reservation request – please review", ""]
@@ -143,13 +144,6 @@ def _chat_id_from_reservation_thread_id(thread_id: str) -> str | None:
     if len(parts) < 3:
         return None
     return ":".join(parts[1:-1])
-
-
-def _reservation_is_pending(status_dir: Path, thread_id: str) -> bool:
-    status_path = _status_file_path(status_dir, thread_id)
-    if not status_path.exists():
-        return False
-    return status_path.read_text(encoding="utf-8").strip().lower() == "pending"
 
 
 def _transfer_state_between_threads(
@@ -255,7 +249,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     try:
         chat_id = _chat_id_from_update(update)
         conversation_id = _conversation_id_for_chat(chat_id)
-        status_dir = cast(Path, context.application.bot_data["reservation_status_dir"])
         chat_thread_modes = cast(
             dict[str, str], context.application.bot_data.setdefault("chat_thread_modes", {})
         )
@@ -264,7 +257,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             context.application.bot_data.setdefault("pending_reservation_threads", {}),
         )
         reservation_thread_id = _thread_id_for_intent(chat_id=chat_id, intent="reservation")
-        if _reservation_is_pending(status_dir, reservation_thread_id):
+        if await reservation_is_pending(reservation_thread_id):
             pending_threads[chat_id] = reservation_thread_id
         current_mode = chat_thread_modes.get(chat_id, "info")
         if chat_id in pending_threads:
@@ -279,8 +272,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if should_create_pending_file and current_mode == "reservation":
             if chat_id not in pending_threads:
                 pending_threads[chat_id] = reservation_thread_id
-                _status_file_path(status_dir, reservation_thread_id).write_text(
-                    "pending", encoding="utf-8"
+                await append_reservation_status(
+                    thread_id=reservation_thread_id,
+                    status="pending",
+                    reservation=cast(ReservationData, reservation or {}),
                 )
             chat_thread_modes[chat_id] = "info"
             admin_chat_id = settings.telegram_admin_chat_id.strip()
@@ -302,7 +297,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     await context.application.bot.send_message(
                         chat_id=int(admin_chat_id),
                         text=admin_text,
-                        reply_markup=keyboard,
+                        reply_markup=keyboard, # approve / reject buttons
                     )
                 except Exception:
                     logging.getLogger(__name__).exception(
@@ -347,16 +342,11 @@ async def handle_admin_callback(
     if not thread_id or not thread_id.startswith("tg:") or not thread_id.endswith(":reservation"):
         await callback.answer("Invalid thread ID.")
         return
-    status_dir = cast(Path, context.application.bot_data.get("reservation_status_dir"))
-    if status_dir is None:
-        await callback.answer("Status directory not available.")
-        return
-    status_path = _status_file_path(status_dir, thread_id)
-    if not status_path.exists():
+    latest_status = await get_latest_reservation_status(thread_id)
+    if latest_status is None:
         await callback.answer("Reservation already processed or not found.")
         return
-    status_value = status_path.read_text(encoding="utf-8").strip().lower()
-    if status_value != "pending":
+    if latest_status != "pending":
         await callback.answer("Reservation already processed.")
         return
     new_status = "approved" if action == "approve" else "rejected"
@@ -394,9 +384,10 @@ async def handle_admin_callback(
         )
         chat_thread_modes[chat_id] = "info"
         pending_threads.pop(chat_id, None)
-        timestamp = datetime.now().strftime("%Y%m%d%H%M")
-        processed_path = status_path.parent / f"{status_path.stem}_processed_{timestamp}{status_path.suffix}"
-        status_path.rename(processed_path)
+        await append_reservation_status(
+            thread_id=thread_id,
+            status=new_status,
+        )
     except Exception:
         logging.getLogger(__name__).exception(
             "Failed to process admin decision for thread %s", thread_id
@@ -424,11 +415,8 @@ def run_bot() -> None:
         raise ValueError("TELEGRAM_BOT_TOKEN is required to run the Telegram bot.")
 
     graph_app = build_graph(checkpointer=InMemorySaver())
-    reservation_status_dir = Path.cwd() / "runtime" / "reservation_status"
-    reservation_status_dir.mkdir(parents=True, exist_ok=True)
     application = Application.builder().token(token).build()
     application.bot_data["graph_app"] = graph_app
-    application.bot_data["reservation_status_dir"] = reservation_status_dir
     application.bot_data.setdefault("chat_thread_modes", {})
     application.bot_data.setdefault("pending_reservation_threads", {})
 
