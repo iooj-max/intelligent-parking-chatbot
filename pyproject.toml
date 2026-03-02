@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parking-agent"
+version = "0.1.0"
+description = "Parking assistant agent"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest>=8.0.0",
+    "langchain>=0.2.0",
+    "langchain-community>=0.2.0",
+    "langchain-openai>=0.1.21",
+    "langchain-weaviate>=0.0.6",
+    "langgraph>=0.2.0",
+    "langsmith>=0.1.0",
+    "pydantic>=2.0.0",
+    "psycopg[binary]>=3.2.0",
+    "python-dotenv>=1.2.1",
+    "sqlalchemy>=2.0.0",
+    "weaviate-client>=4.10.2",
+    "langgraph-cli[inmem]",
+    "python-telegram-bot>=22.5",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:Pydantic serializer warnings:UserWarning",
+    "ignore::UserWarning:pydantic.main",
+]

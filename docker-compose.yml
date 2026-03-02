@@ -1,0 +1,41 @@
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.28.4
+    hostname: node1
+    ports:
+      - "8080:8080"   # REST API
+      - "50051:50051" # gRPC
+    volumes:
+      - ./.docker-data/weaviate:/var/lib/weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      CLUSTER_HOSTNAME: node1
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.docker-data/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: parking
+      POSTGRES_USER: parking
+      POSTGRES_PASSWORD: parking
+    restart: unless-stopped
+
+  parking-bot:
+    build: .
+    depends_on:
+      - postgres
+      - weaviate
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      WEAVIATE_URL: http://weaviate:8080
+      WEAVIATE_HTTP_HOST: weaviate
+      WEAVIATE_GRPC_HOST: weaviate
+    restart: unless-stopped

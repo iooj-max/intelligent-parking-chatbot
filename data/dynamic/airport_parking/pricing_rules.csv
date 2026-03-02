@@ -1,0 +1,6 @@
+rule_name,time_unit,price_per_unit,min_duration_minutes,max_duration_minutes,day_of_week_start,day_of_week_end,time_start,time_end,priority,is_active
+Daily Rate,day,12.00,,,,,,,1,true
+Weekly Rate,week,70.00,10080,,,,,,3,true
+Two Week Rate,week,65.00,20160,,,,,,4,true
+Monthly Rate,month,220.00,43200,,,,,,5,true
+Hourly Rate,hour,4.00,,1440,,,,,2,true

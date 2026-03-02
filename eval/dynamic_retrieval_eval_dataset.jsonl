@@ -1,0 +1,20 @@
+{"query":"List all parking facilities with their names and total spaces.","relevant_doc_ids":["parking_facilities"],"notes":"Facility inventory from parking_facilities table."}
+{"query":"What is the address of Airport Long-Term Parking?","relevant_doc_ids":["parking_facilities"],"notes":"Facility address lookup."}
+{"query":"What is the address of Downtown Plaza Parking?","relevant_doc_ids":["parking_facilities"],"notes":"Facility address lookup."}
+{"query":"How many total spaces are defined for each parking facility?","relevant_doc_ids":["parking_facilities"],"notes":"Capacity by facility."}
+{"query":"Show current occupied and available spaces for each parking facility.","relevant_doc_ids":["space_availability","parking_facilities"],"notes":"Join availability and facility capacity."}
+{"query":"What is the occupancy percentage for airport_parking?","relevant_doc_ids":["space_availability","parking_facilities"],"notes":"Compute occupancy ratio from occupied/total spaces."}
+{"query":"What is the occupancy percentage for downtown_plaza?","relevant_doc_ids":["space_availability","parking_facilities"],"notes":"Compute occupancy ratio from occupied/total spaces."}
+{"query":"What are the regular working hours by day of week for airport_parking?","relevant_doc_ids":["working_hours"],"notes":"Regular weekly schedule."}
+{"query":"What are the regular working hours by day of week for downtown_plaza?","relevant_doc_ids":["working_hours"],"notes":"Regular weekly schedule."}
+{"query":"Are there any days marked as closed in regular working hours?","relevant_doc_ids":["working_hours"],"notes":"Check is_closed in working_hours."}
+{"query":"List all special hours and closure dates for airport_parking.","relevant_doc_ids":["special_hours"],"notes":"Holiday and special schedule rows."}
+{"query":"List all special hours and closure dates for downtown_plaza.","relevant_doc_ids":["special_hours"],"notes":"Holiday and special schedule rows."}
+{"query":"Is airport_parking closed on 2026-12-25?","relevant_doc_ids":["special_hours"],"notes":"Date-specific closure status."}
+{"query":"Is downtown_plaza closed on 2026-07-04 or does it have limited hours?","relevant_doc_ids":["special_hours"],"notes":"Date-specific special-hours check."}
+{"query":"Show all active pricing rules for airport_parking ordered by priority.","relevant_doc_ids":["pricing_rules"],"notes":"Pricing rules and priority."}
+{"query":"Show all active pricing rules for downtown_plaza ordered by priority.","relevant_doc_ids":["pricing_rules"],"notes":"Pricing rules and priority."}
+{"query":"What is the hourly parking rate for airport_parking?","relevant_doc_ids":["pricing_rules"],"notes":"Rate lookup for hourly rule."}
+{"query":"What is the hourly parking rate for downtown_plaza?","relevant_doc_ids":["pricing_rules"],"notes":"Rate lookup for hourly rule."}
+{"query":"What is the daily maximum rule for downtown_plaza?","relevant_doc_ids":["pricing_rules"],"notes":"Find daily cap rule details."}
+{"query":"Compare base daily rates between airport_parking and downtown_plaza.","relevant_doc_ids":["pricing_rules"],"notes":"Cross-facility pricing comparison."}
