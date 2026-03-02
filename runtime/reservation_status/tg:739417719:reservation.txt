@@ -1,0 +1,2 @@
+airport_parking|Artem|NV3242F|2026-03-25|12:20|2 | pending | 2026-03-02T19:36:35+00:00
+airport_parking|Artem|NV3242F|2026-03-25|12:20|2 | approved | 2026-03-02T19:36:58+00:00
