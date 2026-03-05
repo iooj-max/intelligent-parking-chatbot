@@ -1,0 +1,31 @@
+{"query":"How can I book airport parking in advance?","parking_id":"airport_parking","relevant_doc_ids":["booking_process.md"],"notes":"Booking workflow and required steps."}
+{"query":"What are the steps to reserve a parking lot at Downtown Plaza?","parking_id":"downtown_plaza","relevant_doc_ids":["booking_process.md"],"notes":"Reservation process instructions."}
+{"query":"Do I need confirmation after I complete a booking at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["booking_process.md"],"notes":"Booking confirmation details."}
+{"query":"What information do I need to provide to complete a parking booking at the airport?","parking_id":"airport_parking","relevant_doc_ids":["booking_process.md"],"notes":"Required input fields in process."}
+{"query":"What payment methods are accepted at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["faq.md"],"notes":"Frequently asked payment topics."}
+{"query":"Can I get a refund if I cancel my Downtown Plaza parking booking?","parking_id":"downtown_plaza","relevant_doc_ids":["policies.md"],"notes":"FAQ"}
+{"query":"Is there a grace period if I arrive late at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["faq.md","policies.md"],"notes":"Common operational question."}
+{"query":"How do I contact support about my Downtown Plaza booking?","parking_id":"downtown_plaza","relevant_doc_ids":["general_info.md"],"notes":"Contact details."}
+{"query":"What should I do if I lose my parking ticket at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["faq.md","policies.md"],"notes":"Issue handling and rules."}
+{"query":"Are there discounts for long-term parking at Downtown Plaza?","parking_id":"downtown_plaza","relevant_doc_ids":["faq.md"],"notes":"Pricing-related FAQ item."}
+{"query":"Does Downtown Plaza Parking have EV charging stations?","parking_id":"downtown_plaza","relevant_doc_ids":["features.md"],"notes":"Amenities and feature listing."}
+{"query":"Are there covered parking spaces at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["features.md"],"notes":"Facility features."}
+{"query":"Is there CCTV security at the Downtown Plaza area?","parking_id":"downtown_plaza","relevant_doc_ids":["features.md"],"notes":"Security amenity information."}
+{"query":"Do you provide accessible parking spaces at Downtown Plaza?","parking_id":"downtown_plaza","relevant_doc_ids":["features.md","policies.md"],"notes":"Feature and policy requirements."}
+{"query":"Are there shuttle services from airport parking to terminal?","parking_id":"airport_parking","relevant_doc_ids":["features.md"],"notes":"Transportation amenities."}
+{"query":"Can oversized vehicles use the airport parking lot?","parking_id":"airport_parking","relevant_doc_ids":["features.md","policies.md"],"notes":"Supported vehicle types and restrictions."}
+{"query":"What are the customer service phone number and email for airport parking?","parking_id":"airport_parking","relevant_doc_ids":["general_info.md"],"notes":"General contact information."}
+{"query":"What are the business hours for customer support at Downtown Plaza?","parking_id":"downtown_plaza","relevant_doc_ids":["general_info.md"],"notes":"General operational information."}
+{"query":"What is the official name of the airport parking service?","parking_id":"airport_parking","relevant_doc_ids":["general_info.md"],"notes":"Overview-level static information."}
+{"query":"Can I see a general overview of Downtown Plaza parking options?","parking_id":"downtown_plaza","relevant_doc_ids":["general_info.md","features.md"],"notes":"Overview plus key features."}
+{"query":"Where exactly is the airport parking entrance located?","parking_id":"airport_parking","relevant_doc_ids":["location.md"],"notes":"Access and physical location info."}
+{"query":"How do I get to Downtown Plaza parking from downtown?","parking_id":"downtown_plaza","relevant_doc_ids":["location.md"],"notes":"Directions and route guidance."}
+{"query":"What landmarks are near the airport parking facility?","parking_id":"airport_parking","relevant_doc_ids":["location.md"],"notes":"Location context and references."}
+{"query":"Is there GPS navigation guidance for reaching the airport lot?","parking_id":"airport_parking","relevant_doc_ids":["location.md"],"notes":"Navigation/access information."}
+{"query":"Which terminal is closest to the airport parking area?","parking_id":"airport_parking","relevant_doc_ids":["location.md"],"notes":"Proximity and access details."}
+{"query":"What are the parking rules at Downtown Plaza?","parking_id":"downtown_plaza","relevant_doc_ids":["policies.md"],"notes":"Core parking policy content."}
+{"query":"Which vehicle types are not allowed at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["policies.md"],"notes":"Restriction rules."}
+{"query":"What happens if I overstay my reserved parking time at Downtown Plaza?","parking_id":"downtown_plaza","relevant_doc_ids":["policies.md","faq.md"],"notes":"Policy and common question overlap."}
+{"query":"Are there penalties for violating parking rules at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["policies.md"],"notes":"Enforcement section of policies."}
+{"query":"Do you have terms for unattended vehicles at Downtown Plaza?","parking_id":"downtown_plaza","relevant_doc_ids":["policies.md"],"notes":"Safety and compliance requirements."}
+{"query":"What are the parking rules at airport parking?","parking_id":"airport_parking","relevant_doc_ids":["policies.md"],"notes":"Core parking policy content."}

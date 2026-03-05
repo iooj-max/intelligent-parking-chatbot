@@ -1,0 +1,10 @@
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "dependencies": ["."],
+  "graphs": {
+    "parking_agent": "./src/parking_agent/graph.py:make_graph",
+    "parking_agent_routing": "./src/parking_agent/graph.py:make_routing_graph"
+  },
+  "env": ".env"
+}
+

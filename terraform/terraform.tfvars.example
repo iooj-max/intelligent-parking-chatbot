@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in values.
+# Do NOT commit terraform.tfvars (add to .gitignore).
+
+project_id             = "your-gcp-project-id"
+region                 = "us-central1"
+telegram_bot_token     = "your-telegram-bot-token"
+openai_api_key         = "sk-your-openai-key"
+telegram_admin_chat_id = "your-admin-telegram-chat-id"
+db_password            = "secure-random-password"
+
+# Optional: Weaviate Cloud URL. When set, Weaviate Cloud Run is skipped (recommended).
+# Create a free cluster at https://console.weaviate.cloud/ and paste the URL.
+# weaviate_url = "https://your-cluster.weaviate.network"
+# weaviate_api_key = "your-weaviate-cloud-api-key"
+
+# When weaviate_url is empty, Terraform tries to deploy Weaviate on Cloud Run (experimental).
+image_tag    = "latest"
+min_instances = 0
+max_instances = 1
+
+# Cloud SQL: default allows 0.0.0.0/0 for Cloud SQL Proxy from local machine.
+# Restrict in production: cloud_sql_authorized_networks = [{ name = "my-ip", value = "YOUR_IP/32" }]
